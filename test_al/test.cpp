@@ -8,17 +8,19 @@
 #include <ctime>
 #include <string>
 #include <vector>
-#include <iomanip>  // ÎªsetprecisionºÍfixedÌí¼ÓÍ·ÎÄ¼ş
+#include <iomanip>  // Îªsetprecisionï¿½ï¿½fixedï¿½ï¿½ï¿½ï¿½Í·ï¿½Ä¼ï¿½
+#include <map>
+#include "DataLogger.h"  // æ·»åŠ å¤´æ–‡ä»¶åŒ…å«
 using namespace std;
 
 #define PI 3.14159265358979323846
 
-// ÔÚÎÄ¼ş¿ªÍ·Ìí¼Ó¸æ¾¯ÏµÍ³Ïà¹Ø¶¨Òå
+// Ä¼Í·Ó¸æ¾¯ÏµÍ³Ø¶
 enum WarningLevel {
-    NORMAL,     // °×É«
-    CAUTION,    // çúçêÉ«
-    WARNING,    // ºìÉ«
-    INVALID     // ÎŞĞ§
+    NORMAL,     // É«
+    CAUTION,    // É«
+    WARNING,    // É«
+    INVALID     // Ğ§
 };
 
 struct WarningMessage {
@@ -30,7 +32,7 @@ struct WarningMessage {
         : message(msg), level(lvl), timestamp(time) {}
 };
 
-// ´«¸ĞÆ÷»ùÀà
+// ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 class Sensor {
 protected:
     double value;
@@ -43,47 +45,73 @@ public:
     void setValidity(bool valid) { isValid = valid; }
 };
 
-// ·¢¶¯»úÀà
+// È» Engine È·Ê¹ DataLogger
 class Engine {
 private:
     Sensor* speedSensor1;
     Sensor* speedSensor2;
     Sensor* egtSensor1;
     Sensor* egtSensor2;
-    Sensor* fuelSensor;  // Ìí¼ÓÈ¼ÓÍ´«¸ĞÆ÷
+    Sensor* fuelSensor;  // È¼Í´
     double fuelFlow;
     double fuelAmount;
     bool isRunning;
     bool isStarting;
-    bool isStopping;  // Ìí¼ÓÍ£³µ×´Ì¬±êÖ¾
-    bool isThrusting;  // Ìí¼ÓÍÆÁ¦±ä»¯×´Ì¬±êÖ¾
-    double stopStartTime;  // ¼ÇÂ¼¿ªÊ¼Í£³µµÄÊ±¼ä
-    static const double RATED_SPEED; // ¶î¶¨×ªËÙ
-    static const double T0;  // ³õÊ¼ÎÂ¶È
-    static const double STOP_DURATION;  // Í£³µ³ÖĞøÊ±¼ä£¨10Ãë£©
+    bool isStopping;  // Í£×´Ì¬
+    bool isThrusting;  // ä»¯×´Ì¬
+    double stopStartTime;  // Ê¼Í£Ê±
+    static const double RATED_SPEED; // ??×ª
+    static const double T0;  // Ê¼
+    static const double STOP_DURATION;  // Í£Ê±ä£¨10
 
-    // ÒÑÓĞµÄ³ÉÔ±±äÁ¿...
-    double N1;        // ×ªËÙ°Ù·Ö±È
-    double temperature; // ÅÅÆøÎÂ¶È
-    double prevFuelAmount; // ÉÏÒ»Ê±¿ÌÈ¼ÓÍÁ¿
-    double timeStep;      // Ê±¼ä²½³¤
+    // ĞµÄ³
+    double N1;        // ×ª
+    double temperature; // Â¶
+    double prevFuelAmount; // Ò»Ê±È¼
+    double timeStep;      // Ê±ä²½
     vector<WarningMessage> warnings;
     double lastWarningTime;
-    double accumulatedTime;  // Ìí¼ÓÀÛ»ıÊ±¼ä±äÁ¿
-    const double THRUST_FUEL_STEP = 1.0;  // Ã¿´ÎÍÆÁ¦±ä»¯µÄÈ¼ÓÍÁ÷Á¿²½½øÖµ
-    const double THRUST_PARAM_MIN_CHANGE = 0.03;  // ×îĞ¡±ä»¯ÂÊ 3%
-    const double THRUST_PARAM_MAX_CHANGE = 0.05;  // ×î´ó±ä»¯ÂÊ 5%
+    double accumulatedTime;  // Û»Ê±
+    const double THRUST_FUEL_STEP = 1.0;  // Ã¿ä»¯È¼
+    const double THRUST_PARAM_MIN_CHANGE = 0.03;  // Ğ¡ä»¯ 3%
+    const double THRUST_PARAM_MAX_CHANGE = 0.05;  // ä»¯ 5%
+    DataLogger* logger;  // Ö¾Â¼Ö¸
+    map<string, double> lastLogTimes;  // Ã¿Ö¾Â¼Ê±
 
     void addWarning(const string& message, WarningLevel level, double currentTime) {
+        // Ç·ÒªÂµÄ¾æ£¨5Ú²Ø¸
         if (currentTime - lastWarningTime >= 5.0 || warnings.empty() ||
             warnings.back().message != message) {
             warnings.push_back(WarningMessage(message, level, currentTime));
             lastWarningTime = currentTime;
+
+            // Ç·ÒªÂ¼Ö¾5Ú²Ø¸Â¼Í¬Ò»
+            auto lastLogIt = lastLogTimes.find(message);
+            if (lastLogIt == lastLogTimes.end() ||
+                (currentTime - lastLogIt->second >= 5.0)) {
+                // Â¼Â¼ log
+                string levelStr;
+                switch (level) {
+                case NORMAL: levelStr = "NORMAL"; break;
+                case CAUTION: levelStr = "CAUTION"; break;
+                case WARNING: levelStr = "WARNING"; break;
+                default: levelStr = "INVALID"; break;
+                }
+
+                // Ê½
+                string logMessage = message + " [" + levelStr + "]";
+                if (logger) {  // È«
+                    logger->logWarning(currentTime, logMessage);
+                }
+
+                // Â¸Â¸
+                lastLogTimes[message] = currentTime;
+            }
         }
     }
 
 public:
-    // ÔÚEngineÀàÖĞ
+    // Engine
     Sensor* getSpeedSensor2() { return speedSensor2; }
     Sensor* getEgtSensor1() { return egtSensor1; }
     Sensor* getEgtSensor2() { return egtSensor2; }
@@ -97,9 +125,9 @@ public:
     void stop() {
         isRunning = false;
         isStarting = false;
-        isStopping = true;  // ½øÈëÍ£³µ½×¶Î
-        stopStartTime = accumulatedTime;  // ¼ÇÂ¼Í£³µ¿ªÊ¼Ê±¼ä
-        fuelFlow = 0;  // È¼ÓÍÁ÷ËÙÖ±½Ó¹éÁã
+        isStopping = true;  // Í£
+        stopStartTime = accumulatedTime;  // Â¼Í£Ê¼Ê±
+        fuelFlow = 0;  // È¼Ö±
     }
 
     void updateFuelFlow() {
@@ -107,7 +135,7 @@ public:
             fuelAmount -= fuelFlow * timeStep;
             if (fuelAmount < 0) fuelAmount = 0;
 
-            // ¸üĞÂÈ¼ÓÍ´«¸ĞÆ÷µÄÖµ
+            // È¼
             fuelSensor->setValue(fuelAmount);
         }
     }
@@ -116,47 +144,48 @@ public:
         speedSensor2 = new Sensor();
         egtSensor1 = new Sensor();
         egtSensor2 = new Sensor();
-        fuelSensor = new Sensor();  // ³õÊ¼»¯È¼ÓÍ´«¸ĞÆ÷
+        fuelSensor = new Sensor();  // Ê¼È¼
         fuelFlow = 0;
         fuelAmount = 20000;
         isRunning = false;
         isStarting = false;
         lastWarningTime = 0;
 
-        // ³õÊ¼»¯Ö®Ç°Î´³õÊ¼»¯µÄ³ÉÔ±±äÁ¿
+        // Ê¼
         N1 = 0;
-        temperature = T0;  // T0ÊÇÖ®Ç°¶¨ÒåµÄ³õÊ¼ÎÂ¶È
+        temperature = T0;  // T0
         prevFuelAmount = fuelAmount;
         timeStep = 0.005;  // 5ms
-        accumulatedTime = 0.0;  // ³õÊ¼»¯ÀÛ»ıÊ±¼ä
+        accumulatedTime = 0.0;  // Ê¼Û»Ê±
         isStopping = false;
         stopStartTime = 0;
-        isThrusting = false;  // ³õÊ¼»¯ÍÆÁ¦×´Ì¬
+        isThrusting = false;  // Ê¼
 
-        // ³õÊ¼»¯EGT´«¸ĞÆ÷µÄ³õÊ¼ÖµÎª»·¾³ÎÂ¶È
+        // Ê¼EGT
         egtSensor1->setValue(T0);
         egtSensor2->setValue(T0);
+        logger = new DataLogger();  // Ö¾Â¼
     }
 
     Sensor* getSpeedSensor1() { return speedSensor1; }
 
     void updateStartPhase(double timeStep) {
         isThrusting = false;
-        // ÀÛ¼ÓÊ±¼ä
+        // Û»Ê±
         accumulatedTime += timeStep;
 
-        // Ìí¼Óµ÷ÊÔÊä³ö
+        // 
         std::cout << "Time step: " << timeStep << ", Accumulated time: " << accumulatedTime << std::endl;
 
         if (accumulatedTime <= 2.0) {
-            // Æô¶¯½×¶Î1£ºÏßĞÔÔö³¤
+            // 1
             double speed = 10000.0 * accumulatedTime;
             N1 = (speed / RATED_SPEED) * 100.0;
 
             speedSensor1->setValue(speed);
             speedSensor2->setValue(speed);
             fuelFlow = 5.0 * accumulatedTime;
-            temperature = T0;  // 2ÃëÊ±ÎÂ¶ÈÓ¦¸ÃÊÇ T0 
+            temperature = T0;  // 2Â¶
 
             egtSensor1->setValue(temperature);
             egtSensor2->setValue(temperature);
@@ -164,8 +193,8 @@ public:
             isStarting = true;
         }
         else {
-            // Æô¶¯½×¶Î2£º¶ÔÊıÔö³¤
-            double t = accumulatedTime - 2.0;  // t´Ó0¿ªÊ¼¼ÆÊ±
+            // 2
+            double t = accumulatedTime - 2.0;  // t0Ê¼Ê±
             double speed = 20000.0 + 23000.0 * log10(1.0 + t);
             N1 = (speed / RATED_SPEED) * 100.0;
 
@@ -173,7 +202,7 @@ public:
             speedSensor2->setValue(speed);
             fuelFlow = 10.0 + 42.0 * log10(1.0 + t);
 
-            // ÎÂ¶È¼ÆËã¹«Ê½Îª T = 900*lg(t-1) + T0
+            // ã¹« T = 900*lg(t-1) + T0
             temperature = 900.0 * log10(t + 1.0) + T0;
 
             double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
@@ -186,7 +215,7 @@ public:
             egtSensor1->setValue(temperature);
             egtSensor2->setValue(temperature);
 
-            // Ö»ÓĞµ±N1´ïµ½95%Ê±²Å×ª»»µ½ÔËĞĞ×´Ì¬
+            // N195%×ª
             if (N1 >= 95.0) {
                 isStarting = false;
                 isRunning = true;
@@ -198,10 +227,10 @@ public:
     }
 
     void start() {
-        isRunning = false;  // ĞŞ¸Ä£ºÏÈÉèÖÃÎªfalse£¬ÈÃÆô¶¯½×¶ÎÕıÈ·Ö´ĞĞ
+        isRunning = false;  // ï¿½false
         isStarting = true;
-        isStopping = false;  // È·±£Í£³µ×´Ì¬±»¹Ø±Õ
-        accumulatedTime = 0.0;  // ÖØÖÃÀÛ»ıÊ±¼ä£¬È·±£Æô¶¯½×¶Î´ÓÍ·¿ªÊ¼
+        isStopping = false;  // Í£
+        accumulatedTime = 0.0;  // Û»Ê±
     }
 
     void update(double timeStep) {
@@ -211,7 +240,7 @@ public:
             updateStartPhase(timeStep);
         }
         else if (isRunning) {
-            // ¸ù¾İÈ¼ÓÍÁ÷Á¿¶ÏÊÇ·ñ´¦ÓÚĞÂµÄÔËĞĞ½×¶Î
+            // È¼
             if (isThrusting) {
                 updateNewRunningPhase(timeStep);
             }
@@ -225,44 +254,44 @@ public:
     }
 
     void updateRunningPhase(double timeStep) {
-        // ÔÚÎÈ¶¨ÔËĞĞ½×¶Î£¬²ÎÊıÔÚ¡À3%·¶Î§ÄÚ²¨¶¯
-        double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;  // Éú³É0.97µ½1.03Ö®¼äµÄËæ»úÒò×Ó
+        // ï¿½ï¿½ï¿½Ğ½×¶Î£Ú¡%
+        double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;  // 0.971.03
 
-        // ¸üĞÂ×ªËÙ
-        double baseSpeed = RATED_SPEED * 0.95;  // 95%¶î¶¨×ªËÙ×÷Îª»ù×¼
+        // ×ª
+        double baseSpeed = RATED_SPEED * 0.95;  // 95%
         double speed = baseSpeed * randFactor;
         N1 = (speed / RATED_SPEED) * 100.0;
 
-        // ¸üĞÂ´«¸ĞÆ÷ÏÔÊ¾Öµ
+        // 
         speedSensor1->setValue(speed);
         speedSensor2->setValue(speed);
 
-        // ¸üĞÂÎÂ¶È - Ê¹ÓÃµ±Ç°ÎÂ¶È×÷Îª»ù×¼£¬Öğ½¥Ç÷½üÄ¿±êÎÂ¶È
-        double targetTemp = 850.0;  // Ä¿±êÎÈÌ¬ÎÂ¶È
+        // Â¶ - 
+        double targetTemp = 850.0;  // Ì¬
         double tempDiff = targetTemp - temperature;
-        double tempAdjustRate = 0.1;  // ÎÂ¶Èµ÷ÕûËÙÂÊ
+        double tempAdjustRate = 0.1;  // 
 
-        // Æ½»¬¹ı¶Éµ½Ä¿±êÎÂ¶È
+        // 
         temperature += tempDiff * tempAdjustRate;
-        // Ìí¼ÓĞ¡·ù²¨¶¯
+        // 
         temperature *= randFactor;
 
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // ¸üĞÂÈ¼ÓÍÁ¿
+        // È¼
         if (fuelFlow > 0) {
-            fuelFlow = 40.0 * randFactor;  // »ù×¼È¼ÓÍÁ÷Á¿40
+            fuelFlow = 40.0 * randFactor;  // 40
             updateFuelFlow();
         }
     }
 
     void updateNewRunningPhase(double timeStep) {
 
-        // Ìí¼ÓĞ¡·ùËæ»ú²¨¶¯£¨1%~3%£©
+        // 1%~3%
         double randFactor = 1.0 + (rand() % 4 - 2) / 100.0;
 
-        // ¸üĞÂ´«¸ĞÆ÷ÏÔÊ¾Öµ
+        // 
         double speed = (N1 / 100.0) * RATED_SPEED * randFactor;
         speedSensor1->setValue(speed);
         speedSensor2->setValue(speed);
@@ -270,12 +299,12 @@ public:
         egtSensor1->setValue(temperature * randFactor);
         egtSensor2->setValue(temperature * randFactor);
 
-        // ¸üĞÂÈ¼ÓÍÁ÷Á¿
+        // È¼
         if (fuelFlow > 0) {
             updateFuelFlow();
         }
 
-        // µ÷ÊÔÊä³ö
+        // 
         std::cout << "New Running Phase - N1: " << N1
             << "%, Temp: " << temperature
             << ", Fuel Flow: " << fuelFlow
@@ -287,24 +316,24 @@ public:
         double elapsedStopTime = accumulatedTime - stopStartTime;
 
         if (elapsedStopTime >= STOP_DURATION) {
-            // Í£³µÍê³É
+            // Í£
             isStopping = false;
             N1 = 0;
-            temperature = T0;  // »Øµ½»·¾³ÎÂ¶È
+            temperature = T0;  // 
             return;
         }
 
-        // Ê¹ÓÃ¶ÔÊıË¥¼õ
-        const double a = 0.9;  // Ë¥¼õÏµÊı
+        // 
+        const double a = 0.9;  // 
 
-        // ¼ÆËãµ±Ç°ÖµÏà¶ÔÓÚÍ£³µ¿ªÊ¼Ê±µÄË¥¼õ±ÈÀı
+        // 
         double decayRatio = pow(a, elapsedStopTime);
 
-        // ¸üĞÂ×ªËÙºÍÎÂ¶È
+        // ×ª
         N1 = N1 * decayRatio;
         temperature = T0 + (temperature - T0) * decayRatio;
 
-        // ¸üĞÂ´«¸ĞÆ÷ÏÔÊ¾Öµ
+        // 
         double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
         double displaySpeed = (N1 / 100.0) * RATED_SPEED * randFactor;
 
@@ -313,14 +342,14 @@ public:
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // µ÷ÊÔÊä³ö
+        // 
         std::cout << "Stop Phase - Time: " << elapsedStopTime
             << "s, N1: " << N1
             << "%, Temp: " << temperature << std::endl;
     }
 
     void checkWarnings(double currentTime) {
-        // ¼ì²é´«¸ĞÆ÷Ğ§ĞÔ
+        // ï¿½ï¿½Ğ§
         if (!speedSensor1->getValidity() && speedSensor2->getValidity()) {
             addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
         }
@@ -337,14 +366,14 @@ public:
             addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
         }
 
-        // Ë«·¢´«¸ĞÆ÷¹ÊÕÏ¼ì²é
+        // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¼ï¿½ï¿½
         if ((!speedSensor1->getValidity() && !speedSensor2->getValidity()) ||
             (!egtSensor1->getValidity() && !egtSensor2->getValidity())) {
             addWarning("Dual Engine Sensor Failure - Shutdown", WARNING, currentTime);
             stop();
         }
 
-        // È¼ÓÍÏµÍ³¼ì²é
+        // È¼ï¿½ï¿½ÏµÍ³ï¿½ï¿½ï¿½
         if (fuelAmount < 1000 && isRunning) {
             addWarning("Low Fuel Level", CAUTION, currentTime);
         }
@@ -357,7 +386,7 @@ public:
             addWarning("Fuel Flow Exceeded Limit", CAUTION, currentTime);
         }
 
-        // ×ªËÙ¼ì²é
+        // ×ªï¿½Ù¼ï¿½ï¿½
         double n1Percent = getN1();
         if (n1Percent > 120) {
             addWarning("N1 Overspeed Level 2 - Engine Shutdown", WARNING, currentTime);
@@ -367,7 +396,7 @@ public:
             addWarning("N1 Overspeed Level 1", CAUTION, currentTime);
         }
 
-        // ÎÂ¶È¼ì²é
+        // ï¿½Â¶È¼ï¿½ï¿½
         if (isStarting) {
             if (temperature > 1000) {
                 addWarning("EGT Overtemp Level 2 During Start - Shutdown", WARNING, currentTime);
@@ -395,42 +424,42 @@ public:
     void increaseThrust() {
         if (!isRunning || isStarting || isStopping) {
             cout << "Not in running state" << endl;
-            return;  // Ö»ÔÚÎÈ¶¨ÔËĞĞ×´Ì¬ÏÂÔÊĞíµ÷½ÚÍÆÁ¦
+            return;  // Ö»ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         }
         isThrusting = true;
 
-        // Ôö¼ÓÈ¼ÓÍÁ÷Á¿
+        // ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         fuelFlow += THRUST_FUEL_STEP;
 
-        // Éú³É3%~5%Ö®¼äµÄËæ»ú±ä»¯ÂÊ
+        // ï¿½ï¿½ï¿½ï¿½3%~5%Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ä»¯ï¿½ï¿½
         double changeRatio = THRUST_PARAM_MIN_CHANGE +
             (static_cast<double>(rand()) / RAND_MAX) *
             (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
 
-        // ¸üĞÂ×ªËÙºÍÎÂ¶È
-        double baseSpeed = RATED_SPEED * N1 / 100.0;  // »ù×¼×ªËÙ
+        // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ùºï¿½ï¿½Â¶ï¿½
+        double baseSpeed = RATED_SPEED * N1 / 100.0;  // ï¿½ï¿½×¼×ªï¿½ï¿½
         double newSpeed = baseSpeed * (1.0 + changeRatio);
         N1 = (newSpeed / RATED_SPEED) * 100.0;
 
 
-        // ÏŞÖÆN1²»³¬¹ı100%
+        // ï¿½ï¿½ï¿½ï¿½N1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½100%
         if (N1 > 125.0) {
             N1 = 125.0;
             newSpeed = RATED_SPEED;
         }
 
-        // ¸üĞÂ´«¸ĞÆ÷ÏÔÊ¾Öµ
+        // ï¿½ï¿½ï¿½Â´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾Öµ
         speedSensor1->setValue(newSpeed);
         speedSensor2->setValue(newSpeed);
 
-        // ¸üĞÂÎÂ¶È
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Â¶ï¿½
         temperature = temperature * (1.0 + changeRatio);
 
-        // ¸üĞÂEGT´«¸ĞÆ÷
+        // ï¿½ï¿½ï¿½ï¿½EGTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // µ÷ÊÔÊä³ö
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         std::cout << "Thrust increased - N1: " << N1
             << "%, Temp: " << temperature
             << ", Fuel Flow: " << fuelFlow << std::endl;
@@ -438,66 +467,66 @@ public:
 
     void decreaseThrust() {
         if (!isRunning || isStarting || isStopping) {
-            return;  // Ö»ÔÚÎÈ¶¨ÔËĞĞ×´Ì¬ÏÂÔÊĞíµ÷½ÚÍÆÁ¦
+            return;  // Ö»ï¿½ï¿½ï¿½È¶ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         }
         isThrusting = true;
 
-        // È·±£È¼ÓÍÁ÷Á¿²»»áµÍÓÚ×îĞ¡Öµ
+        // È·ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¡Öµ
         if (fuelFlow > THRUST_FUEL_STEP) {
             fuelFlow -= THRUST_FUEL_STEP;
         }
 
-        // Éú³É3%~5%Ö®¼äµÄËæ»ú±ä»¯ÂÊ
+        // ï¿½ï¿½ï¿½ï¿½3%~5%Ö®ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ä»¯ï¿½ï¿½
         double changeRatio = THRUST_PARAM_MIN_CHANGE +
             (static_cast<double>(rand()) / RAND_MAX) *
             (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
 
-        // ¸üĞÂ×ªËÙºÍÎÂ¶È
-        double baseSpeed = RATED_SPEED * N1 / 100.0;  // »ù×¼×ªËÙ
+        // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ùºï¿½ï¿½Â¶ï¿½
+        double baseSpeed = RATED_SPEED * N1 / 100.0;  // ï¿½ï¿½×¼×ªï¿½ï¿½
         double newSpeed = baseSpeed * (1.0 - changeRatio);
         N1 = (newSpeed / RATED_SPEED) * 100.0;
 
-        // ÏŞÖÆN1²»µÍÓÚ×îĞ¡Öµ£¨±ÈÈç60%£©
+        // ï¿½ï¿½ï¿½ï¿½N1ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¡Öµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½60%ï¿½ï¿½
         if (N1 < 0) {
             N1 = 0;
             newSpeed = 0;
         }
 
-        // ¸üĞÂ´«¸ĞÆ÷ÏÔÊ¾Öµ
+        // ï¿½ï¿½ï¿½Â´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾Öµ
         speedSensor1->setValue(newSpeed);
         speedSensor2->setValue(newSpeed);
 
-        // ¸üĞÂÎÂ¶È£¬»ù×¼ÎÂ¶È850¶È
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Â¶È£ï¿½ï¿½ï¿½×¼ï¿½Â¶ï¿½850ï¿½ï¿½
         temperature = temperature * (1.0 - changeRatio);
 
-        // ¸üĞÂEGT´«¸ĞÆ÷
+        // ï¿½ï¿½ï¿½ï¿½EGTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // µ÷ÊÔÊä³ö
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         std::cout << "Thrust decreased - N1: " << N1
             << "%, Temp: " << temperature
             << ", Fuel Flow: " << fuelFlow << std::endl;
     }
 
-    // Ìí¼Ó´«¸ĞÆ÷¹ÊÕÏÄ£Äâ·½·¨
+    // ï¿½ï¿½ï¿½Ó´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½â·½ï¿½ï¿½
     void simulateSensorFailure(int sensorType) {
         switch (sensorType) {
-        case 0: // µ¥¸ö×ªËÙ´«¸ĞÆ÷¹ÊÕÏ
+        case 0: // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             speedSensor1->setValidity(false);
             break;
-        case 1: // µ¥·¢×ªËÙ´«¸ĞÆ÷¹ÊÕÏ
+        case 1: // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             speedSensor1->setValidity(false);
             speedSensor2->setValidity(false);
             break;
-        case 2: // µ¥¸öEGT´«¸ĞÆ÷¹ÊÕÏ
+        case 2: // ï¿½ï¿½ï¿½ï¿½EGTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             egtSensor1->setValidity(false);
             break;
-        case 3: // µ¥·¢EGT´«¸ĞÆ÷¹ÊÕÏ
+        case 3: // ï¿½ï¿½ï¿½ï¿½EGTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             egtSensor1->setValidity(false);
             egtSensor2->setValidity(false);
             break;
-            // ... ÆäËûÕÏÄâ
+            // ... ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         }
     }
 
@@ -505,43 +534,47 @@ public:
         return static_cast<double>(GetTickCount64()) / 1000.0;
     }
 
-    // Ìí¼ÓÈ¼ÓÍ´«¸ĞÆ÷µÄ·ÃÎÊ·½·¨
+    // ï¿½ï¿½ï¿½ï¿½È¼ï¿½Í´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä·ï¿½ï¿½Ê·ï¿½ï¿½ï¿½
     Sensor* getFuelSensor() { return fuelSensor; }
 
-    // Îö¹¹º¯ÊıÖĞÉ¾³ıÈ¼ÓÍ´«¸ĞÆ÷
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½É¾ï¿½ï¿½È¼ï¿½Í´ï¿½ï¿½ï¿½ï¿½ï¿½
     ~Engine() {
         delete speedSensor1;
         delete speedSensor2;
         delete egtSensor1;
         delete egtSensor2;
-        delete fuelSensor;  // É¾³ıÈ¼ÓÍ´«¸ĞÆ÷
+        delete fuelSensor;  // É¾ï¿½ï¿½È¼ï¿½Í´ï¿½ï¿½ï¿½ï¿½ï¿½
+        if (logger) {
+            delete logger;  // ï¿½ï¿½È«É¾ï¿½ï¿½ï¿½ï¿½Ö¾ï¿½ï¿½Â¼ï¿½ï¿½
+            logger = nullptr;
+        }
     }
 };
 
 const double Engine::RATED_SPEED = 40000.0;
 const double Engine::T0 = 20.0;
-const double Engine::STOP_DURATION = 10.0;  // 10ÃëÍ£³µÊ±¼ä
+const double Engine::STOP_DURATION = 10.0;  // 10ï¿½ï¿½Í£ï¿½ï¿½Ê±ï¿½ï¿½
 
-// GUIÀà
+// GUIï¿½ï¿½
 class GUI {
 private:
-    static const int WINDOW_WIDTH = 1600;    // Ôö¼Ó´°¿Ú¿í¶È
-    static const int WINDOW_HEIGHT = 900;    // Ôö¼Ó´°¿Ú¸ß¶È
-    static const int DIAL_RADIUS = 60;       // µ÷Õû±íÅÌ´óĞ¡
-    static const int DIAL_SPACING_X = 180;   // µ÷Õû±íÅÌË®Æ½¼ä
-    static const int DIAL_SPACING_Y = 180;   // Ôö¼Ó´¹Ö±¼ä¾à£¬´Ó140¸ÄÎª180
-    static const int DIAL_START_X = 100;     // µ÷Õû±íÅÌÆğÊ¼Î»ÖÃ
+    static const int WINDOW_WIDTH = 1600;    // ï¿½ï¿½ï¿½Ó´ï¿½ï¿½Ú¿ï¿½ï¿½ï¿½
+    static const int WINDOW_HEIGHT = 900;    // ï¿½ï¿½ï¿½Ó´ï¿½ï¿½Ú¸ß¶ï¿½
+    static const int DIAL_RADIUS = 60;       // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì´ï¿½Ğ¡
+    static const int DIAL_SPACING_X = 180;   // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ë®Æ½ï¿½ï¿½
+    static const int DIAL_SPACING_Y = 180;   // ï¿½ï¿½ï¿½Ó´ï¿½Ö±ï¿½ï¿½à£¬ï¿½ï¿½140ï¿½ï¿½Îª180
+    static const int DIAL_START_X = 100;     // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¼Î»ï¿½ï¿½
     static const int DIAL_START_Y = 150;
-    static const int WARNING_BOX_WIDTH = 380;  // µ÷Õû¾¯¸æ¿ò¿í¶È
+    static const int WARNING_BOX_WIDTH = 380;  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     static const int WARNING_BOX_HEIGHT = 30;
     static const int WARNING_START_X = 750;
     static const int WARNING_START_Y = 100;
     static const int WARNING_SPACING = 5;
-    static const int REFRESH_RATE = 200;  // 200Hz = 5msË¢ĞÂÒ»´Î
+    static const int REFRESH_RATE = 200;  // 200Hz = 5msË¢ï¿½ï¿½Ò»ï¿½ï¿½
     static const int FRAME_TIME = 1000 / REFRESH_RATE;  // 5ms
     ULONGLONG lastFrameTime;
     IMAGE* backBuffer;
-    Engine* engine;  // È·±£ engine Ö¸Õë±»ÕıÈ·ÉùÃ÷
+    Engine* engine;  // È·ï¿½ï¿½ engine Ö¸ï¿½ë±»ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½
 
 public:
     struct Button {
@@ -558,23 +591,23 @@ public:
     Button decreaseThrust;
 
     GUI(int w, int h, Engine* eng) : engine(eng) {
-        // È·±£ engine Ö¸ÕëÓĞĞ§
+        // È·ï¿½ï¿½ engine Ö¸ï¿½ï¿½ï¿½ï¿½Ğ§
         if (!eng) {
             throw std::runtime_error("Invalid engine pointer");
         }
 
-        // Ê×ÏÈ³õÊ¼»¯°´Å¥£¬ÕâÑùÔÚÔ¤ÈÈÊ±¾ÍÄÜÊ¹ÓÃ
+        // ï¿½ï¿½ï¿½È³ï¿½Ê¼ï¿½ï¿½ï¿½ï¿½Å¥ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô¤ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½
         startButton = { 50, 500, 120, 40, _T("START"), false, RGB(0, 150, 0), WHITE };
         stopButton = { 200, 500, 120, 40, _T("STOP"), false, RGB(150, 0, 0), WHITE };
         increaseThrust = { 350, 500, 120, 40, _T("THRUST+"), false, RGB(0, 100, 150), WHITE };
         decreaseThrust = { 500, 500, 120, 40, _T("THRUST-"), false, RGB(0, 100, 150), WHITE };
 
-        // ³õÊ¼»¯Í¼ĞÎÏµÍ³
+        // ï¿½ï¿½Ê¼ï¿½ï¿½Í¼ï¿½ï¿½ÏµÍ³
         initgraph(WINDOW_WIDTH, WINDOW_HEIGHT);
         setbkcolor(RGB(40, 40, 40));
         cleardevice();
 
-        // ´´½¨ºó±¸»º³åÇø
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ó±¸»ï¿½ï¿½ï¿½ï¿½ï¿½
         backBuffer = new IMAGE(WINDOW_WIDTH, WINDOW_HEIGHT);
         if (!backBuffer) {
             throw std::runtime_error("Failed to create back buffer");
@@ -584,7 +617,7 @@ public:
         cleardevice();
         SetWorkingImage(NULL);
 
-        // Ô¤ÈÈ»æÍ¼ÏµÍ³
+        // Ô¤ï¿½È»ï¿½Í¼ÏµÍ³
         BeginBatchDraw();
         for (int i = 0; i < 5; i++) {
             cleardevice();
@@ -610,33 +643,33 @@ public:
 
     void drawArcDial(int x, int y, int radius, double value, double maxValue,
         const TCHAR* label, COLORREF color) {
-        // »æÖÆÍêÕûµÄÔ²ĞÎµ×ÅÌ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ô²ï¿½Îµï¿½ï¿½ï¿½
         setcolor(RGB(60, 60, 60));
         setfillcolor(RGB(20, 20, 20));
         fillcircle(x, y, radius);
 
-        // ¶ÔÓÚ×ªËÙ±íÅÌºÍEGT±íÅÌµÄÌØÊâ´¦Àí
+        // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù±ï¿½ï¿½Ìºï¿½EGTï¿½ï¿½ï¿½Ìµï¿½ï¿½ï¿½ï¿½â´¦ï¿½ï¿½
         bool isN1Dial = _tcsstr(label, _T("N1")) != nullptr;
         bool isEGTDial = _tcsstr(label, _T("EGT")) != nullptr;
         double valueToDisplay = value;
         double maxValueToDisplay = maxValue;
         bool isStarting = engine->getIsStarting();
-        int arcDegrees = 360;  // Ä¬ÈÏÎª360¶È
+        int arcDegrees = 360;  // Ä¬ï¿½ï¿½Îª360ï¿½ï¿½
 
         if (isN1Dial) {
-            valueToDisplay = (value / 40000.0) * 100;  // 40000ÊÇ¶î¶¨×ªËÙ
-            maxValueToDisplay = 125;  // ×î´ó125%
-            arcDegrees = 210;  // N1±íÅÌÊ¹ÓÃ210¶È
+            valueToDisplay = (value / 40000.0) * 100;  // 40000ï¿½Ç¶î¶¨×ªï¿½ï¿½
+            maxValueToDisplay = 125;  // ï¿½ï¿½ï¿½125%
+            arcDegrees = 210;  // N1ï¿½ï¿½ï¿½ï¿½Ê¹ï¿½ï¿½210ï¿½ï¿½
         }
         else if (isEGTDial) {
-            maxValueToDisplay = 1200;  // EGT×î´óÖµ1200¶È
-            arcDegrees = 210;   // EGT±íÅÌÒ²Ê¹ÓÃ210¶È»¡ĞÎ
+            maxValueToDisplay = 1200;  // EGTï¿½ï¿½ï¿½Öµ1200ï¿½ï¿½
+            arcDegrees = 210;   // EGTï¿½ï¿½ï¿½ï¿½Ò²Ê¹ï¿½ï¿½210ï¿½È»ï¿½ï¿½ï¿½
         }
 
-        // »æÖÆ¿Ì¶È
-        int startAngle = 90;  // ÆğÊ¼½Ç¶È£¨12µãÖÓÎ»ÖÃ£©
+        // ï¿½ï¿½ï¿½Æ¿Ì¶ï¿½
+        int startAngle = 90;  // ï¿½ï¿½Ê¼ï¿½Ç¶È£ï¿½12ï¿½ï¿½ï¿½ï¿½Î»ï¿½Ã£ï¿½
 
-        // »æÖÆÖ÷¿Ì¶ÈÏß
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½ï¿½ï¿½
         for (int i = 0; i <= arcDegrees; i += 30) {
             double angle = (startAngle - i) * PI / 180;
             int x1 = x + (radius - 10) * cos(angle);
@@ -648,9 +681,9 @@ public:
             line(x1, y1, x2, y2);
         }
 
-        // »æÖÆ´Î¿Ì¶ÈÏß
+        // ï¿½ï¿½ï¿½Æ´Î¿Ì¶ï¿½ï¿½ï¿½
         for (int i = 0; i <= arcDegrees; i += 6) {
-            if (i % 30 != 0) {  // Ìø¹ıÖ÷¿Ì¶ÈÎ»
+            if (i % 30 != 0) {  // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¶ï¿½Î»
                 double angle = (startAngle - i) * PI / 180;
                 int x1 = x + (radius - 5) * cos(angle);
                 int y1 = y - (radius - 5) * sin(angle);
@@ -662,39 +695,39 @@ public:
             }
         }
 
-        // ¸ù¾İÖµµÄ×´Ì¬Ñ¡ÔñÑÕÉ«
-        COLORREF valueColor = RGB(255, 255, 255);  // Ä¬ÈÏ°×É«
+        // ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½×´Ì¬Ñ¡ï¿½ï¿½ï¿½ï¿½É«
+        COLORREF valueColor = RGB(255, 255, 255);  // Ä¬ï¿½Ï°ï¿½É«
         if (isN1Dial) {
             if (valueToDisplay > 105) valueColor = RGB(255, 128, 0);
             if (valueToDisplay > 120) valueColor = RGB(255, 0, 0);
         }
         else if (isEGTDial) {
             if (isStarting) {
-                // Æô¶¯¹ı³ÌÖĞµÄÎÂ¶È¾¯¸æ
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğµï¿½ï¿½Â¶È¾ï¿½ï¿½ï¿½
                 if (valueToDisplay > 1000) {
-                    valueColor = RGB(255, 0, 0);      // ºìÉ«¾¯¸æ£¨³¬ÎÂ2£©
+                    valueColor = RGB(255, 0, 0);      // ï¿½ï¿½É«ï¿½ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½ï¿½2ï¿½ï¿½
                 }
                 else if (valueToDisplay > 850) {
-                    valueColor = RGB(255, 128, 0);    // çúçêÉ«¾¯¸æ£¨³¬ÎÂ1£©
+                    valueColor = RGB(255, 128, 0);    // ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½ï¿½1ï¿½ï¿½
                 }
             }
             else {
-                // ÎÈÌ¬ÔËĞĞÊ±µÄÎÂ¶È¾¯¸æ
+                // ï¿½ï¿½Ì¬ï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½Â¶È¾ï¿½ï¿½ï¿½
                 if (valueToDisplay > 1100) {
-                    valueColor = RGB(255, 0, 0);      // ºìÉ«¾¯¸æ£¨³¬ÎÂ4£©
+                    valueColor = RGB(255, 0, 0);      // ï¿½ï¿½É«ï¿½ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½ï¿½4ï¿½ï¿½
                 }
                 else if (valueToDisplay > 950) {
-                    valueColor = RGB(255, 128, 0);    // çúçêÉ«¾¯¸æ£¨³¬ÎÂ3£©
+                    valueColor = RGB(255, 128, 0);    // ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½æ£¨ï¿½ï¿½ï¿½ï¿½3ï¿½ï¿½
                 }
             }
         }
 
-        // »æÖÆÖµµÄ»¡ĞÎ±³¾°
+        // ï¿½ï¿½ï¿½ï¿½Öµï¿½Ä»ï¿½ï¿½Î±ï¿½ï¿½ï¿½
         double angleRatio = isN1Dial ? (valueToDisplay / maxValueToDisplay) : (valueToDisplay / maxValue);
         angleRatio = min(angleRatio, 1.0);
         double angle = angleRatio * arcDegrees;
 
-        // Ê¹ÓÃ½¥±äÉ«»æÖÆ»¡ĞÎ
+        // Ê¹ï¿½Ã½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½Æ»ï¿½ï¿½ï¿½
         setfillcolor(valueColor);
         setcolor(valueColor);
         POINT* points = new POINT[362];
@@ -703,36 +736,36 @@ public:
 
         for (int i = 0; i <= angle; i++) {
             double rad = (90 - i) * PI / 180;
-            points[i + 1].x = x + (radius - 15) * cos(rad);  // ¼õĞ¡Ìî³ä°ë¾¶£¬Áô³ö¿Ì¶È¿Õ¼ä
+            points[i + 1].x = x + (radius - 15) * cos(rad);  // ï¿½ï¿½Ğ¡ï¿½ï¿½ï¿½ë¾¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ì¶È¿Õ¼ï¿½
             points[i + 1].y = y - (radius - 15) * sin(rad);
         }
 
         solidpolygon(points, static_cast<int>(angle) + 2);
         delete[] points;
 
-        // »æÖÆÖ¸Õë
+        // ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½
         double pointerAngle = (90 - angle) * PI / 180;
         int pointerLength = radius - 10;
         int pointerX = x + pointerLength * cos(pointerAngle);
         int pointerY = y - pointerLength * sin(pointerAngle);
 
-        // »æÖÆÖ¸ÕëÒõÓ°
+        // ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ï¿½ï¿½ï¿½Ó°
         setcolor(RGB(20, 20, 20));
         setlinestyle(PS_SOLID, 3);
         line(x, y, pointerX + 2, pointerY + 2);
 
-        // »æÖÆÖ¸Õë±¾Ìå
+        // ï¿½ï¿½ï¿½ï¿½Ö¸ï¿½ë±¾ï¿½ï¿½
         setcolor(WHITE);
         setlinestyle(PS_SOLID, 2);
         line(x, y, pointerX, pointerY);
 
-        // »æÖÆÖĞĞÄ×°ÊÎ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×°ï¿½ï¿½
         setfillcolor(RGB(40, 40, 40));
         fillcircle(x, y, 8);
         setfillcolor(valueColor);
         fillcircle(x, y, 4);
 
-        // »æÖÆ±êÇ©ºÍÊıÖµ
+        // ï¿½ï¿½ï¿½Æ±ï¿½Ç©ï¿½ï¿½ï¿½ï¿½Öµ
         settextstyle(20, 0, _T("Arial"));
         settextcolor(valueColor);
         TCHAR valueText[32];
@@ -746,7 +779,7 @@ public:
     }
 
     void drawDials() {
-        // µÚÒ»ĞĞ - ×ó·¢¶¯»ú´«¸ĞÆ÷
+        // ï¿½ï¿½Ò»ï¿½ï¿½ - ï¿½ó·¢¶ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         drawArcDial(DIAL_START_X, DIAL_START_Y, DIAL_RADIUS,
             engine->getSpeedSensor1()->getValue(), 40000, _T("N1-L1"), RGB(0, 255, 0));
         drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y, DIAL_RADIUS,
@@ -756,7 +789,7 @@ public:
         drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y, DIAL_RADIUS,
             engine->getEgtSensor2()->getValue(), 1200, _T("EGT-L2"), RGB(255, 128, 0));
 
-        // µÚ¶şĞĞ - ÓÒ·¢¶¯»ú´«¸ĞÆ÷ (Ôö¼ÓÁË´¹Ö±¼ä¾à)
+        // ï¿½Ú¶ï¿½ï¿½ï¿½ - ï¿½Ò·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½?? (ï¿½ï¿½ï¿½ï¿½ï¿½Ë´ï¿½Ö±ï¿½ï¿½ï¿½)
         drawArcDial(DIAL_START_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
             engine->getSpeedSensor1()->getValue(), 40000, _T("N1-R1"), RGB(0, 255, 0));
         drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
@@ -768,16 +801,16 @@ public:
     }
 
     void drawButton(const Button& btn) {
-        // »æÖÆ°´Å¥±³¾°
+        // ï¿½ï¿½ï¿½Æ°ï¿½Å¥ï¿½ï¿½ï¿½ï¿½
         setfillcolor(btn.pressed ? RGB(150, 150, 150) : btn.bgColor);
         solidroundrect(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, 10, 10);
 
-        // »æÖÆ°´Å¥×Ö
+        // ï¿½ï¿½ï¿½Æ°ï¿½Å¥ï¿½ï¿½
         settextstyle(20, 0, _T("Arial"));
         setbkmode(TRANSPARENT);
         settextcolor(btn.textColor);
 
-        // ¼ÆËãÎÄ×ÖÎ»ÖÃÊ¹Æä¾ÓÖĞ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½Ê¹ï¿½ï¿½ï¿½ï¿½ï¿½
         int textWidth = textwidth(btn.text);
         int textHeight = textheight(btn.text);
         int textX = btn.x + (btn.width - textWidth) / 2;
@@ -821,31 +854,31 @@ public:
         COLORREF boxColor;
         switch (level) {
         case NORMAL: boxColor = WHITE; break;
-        case CAUTION: boxColor = RGB(255, 128, 0); break;  // çúçêÉ«
-        case WARNING: boxColor = RGB(255, 0, 0); break;    // ºìÉ«
-        default: boxColor = RGB(128, 128, 128);            // »ÒÉ«
+        case CAUTION: boxColor = RGB(255, 128, 0); break;  // ï¿½ï¿½ï¿½ï¿½É«
+        case WARNING: boxColor = RGB(255, 0, 0); break;    // ï¿½ï¿½É«
+        default: boxColor = RGB(128, 128, 128);            // ï¿½ï¿½É«
         }
 
-        // »æÖÆ¾¯¸æ¿ò±ß¿òĞ§¹û
-        // Íâ±ß¿ò
+        // ï¿½ï¿½ï¿½Æ¾ï¿½ï¿½ï¿½ï¿½ß¿ï¿½Ğ§ï¿½ï¿½
+        // ï¿½ï¿½ß¿ï¿½
         setfillcolor(RGB(30, 30, 30));
         solidrectangle(x - 2, y - 2, x + WARNING_BOX_WIDTH + 2, y + WARNING_BOX_HEIGHT + 2);
 
-        // ÄÚ²¿Ìî³ä
+        // ï¿½Ú²ï¿½ï¿½ï¿½???
         setfillcolor(isActive ? RGB(60, 60, 60) : RGB(40, 40, 40));
         solidrectangle(x, y, x + WARNING_BOX_WIDTH, y + WARNING_BOX_HEIGHT);
 
-        // »æÖÆ±ß¿ò¸ß¹â
+        // ï¿½ï¿½ï¿½Æ±ß¿ï¿½ß¹ï¿½
         setcolor(isActive ? boxColor : RGB(80, 80, 80));
         rectangle(x - 1, y - 1, x + WARNING_BOX_WIDTH + 1, y + WARNING_BOX_HEIGHT + 1);
 
-        // »æÖÆ¾¯¸æÎÄ±¾
+        // ï¿½ï¿½ï¿½Æ¾ï¿½ï¿½ï¿½ï¿½Ä±ï¿½
         settextstyle(16, 0, _T("Arial"));
         settextcolor(isActive ? boxColor : RGB(128, 128, 128));
         wstring wstr(message.begin(), message.end());
         outtextxy(x + 10, y + 5, wstr.c_str());
 
-        // Èç¹û¾¯¸æ¼¤»î£¬Ìí¼Ó×ó²àÖ¸Ê¾Ìõ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½æ¼¤ï¿½î£¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸Ê¾ï¿½ï¿½
         if (isActive) {
             setfillcolor(boxColor);
             solidrectangle(x, y, x + 3, y + WARNING_BOX_HEIGHT);
@@ -857,43 +890,43 @@ public:
         int y = WARNING_START_Y;
         const vector<WarningMessage>& warnings = engine->getWarnings();
 
-        // ¶¨ÒåËùÓĞ¿ÉÄÜµÄ¾¯¸æ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¿ï¿½ï¿½ÜµÄ¾ï¿½ï¿½ï¿½
         struct WarningDef {
             string message;
             WarningLevel level;
         };
 
         WarningDef allWarnings[] = {
-            // ´«¸ĞÆ÷Òì³£
-            {"Single N1 Sensor Failure", NORMAL},           // µ¥¸ö×ªËÙ´«¸ĞÆ÷¹ÊÕÏ
-            {"Engine N1 Sensor Failure", CAUTION},          // µ¥·¢×ªËÙ´«¸ĞÆ÷¹ÊÕÏ
-            {"Single EGT Sensor Failure", NORMAL},          // µ¥¸öEGT´«¸ĞÆ÷¹ÊÕÏ
-            {"Engine EGT Sensor Failure", CAUTION},         // µ¥·¢EGT´«¸ĞÆ÷¹ÊÕÏ
-            {"Dual Engine Sensor Failure - Shutdown", WARNING},  // Ë«·¢´«¸ĞÆ÷¹ÊÕÏ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ì³£
+            {"Single N1 Sensor Failure", NORMAL},           // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            {"Engine N1 Sensor Failure", CAUTION},          // ï¿½ï¿½ï¿½ï¿½×ªï¿½Ù´ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            {"Single EGT Sensor Failure", NORMAL},          // ï¿½ï¿½ï¿½ï¿½EGTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            {"Engine EGT Sensor Failure", CAUTION},         // ï¿½ï¿½ï¿½ï¿½EGTï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            {"Dual Engine Sensor Failure - Shutdown", WARNING},  // Ë«ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
-            // È¼ÓÍÒì³£
-            {"Low Fuel Level", CAUTION},                    // È¼ÓÍÓàÁ¿µÍ
-            {"Fuel Sensor Failure", WARNING},               // È¼ÓÍÓàÁ¿¹ÊÕÏ
-            {"Fuel Flow Exceeded Limit", CAUTION},          // È¼ÓÍÁ÷ËÙ³¬ÏŞ
+            // È¼ï¿½ï¿½ï¿½ì³£
+            {"Low Fuel Level", CAUTION},                    // È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            {"Fuel Sensor Failure", WARNING},               // È¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+            {"Fuel Flow Exceeded Limit", CAUTION},          // È¼ï¿½ï¿½ï¿½ï¿½ï¿½Ù³ï¿½ï¿½ï¿½
 
-            // ×ªËÙÒì³£
-            {"N1 Overspeed Level 1", CAUTION},             // ³¬×ª1
-            {"N1 Overspeed Level 2 - Engine Shutdown", WARNING}, // ³¬×ª2
+            // ×ªï¿½ï¿½ï¿½ì³£
+            {"N1 Overspeed Level 1", CAUTION},             // ï¿½ï¿½×ª1
+            {"N1 Overspeed Level 2 - Engine Shutdown", WARNING}, // ï¿½ï¿½×ª2
 
-            // ÎÂ¶ÈÒì³£
-            {"EGT Overtemp Level 1 During Start", CAUTION},      // ³¬ÎÂ1
-            {"EGT Overtemp Level 2 During Start - Shutdown", WARNING}, // ³¬ÎÂ2
-            {"EGT Overtemp Level 1 During Run", CAUTION},        // ³¬ÎÂ3
-            {"EGT Overtemp Level 2 During Run - Shutdown", WARNING}    // ³¬ÎÂ4
+            // ï¿½Â¶ï¿½ï¿½ì³£
+            {"EGT Overtemp Level 1 During Start", CAUTION},      // ï¿½ï¿½ï¿½ï¿½1
+            {"EGT Overtemp Level 2 During Start - Shutdown", WARNING}, // ï¿½ï¿½ï¿½ï¿½2
+            {"EGT Overtemp Level 1 During Run", CAUTION},        // ï¿½ï¿½ï¿½ï¿½3
+            {"EGT Overtemp Level 2 During Run - Shutdown", WARNING}    // ï¿½ï¿½ï¿½ï¿½4
         };
 
-        // »æÖÆËùÓĞ¾¯¸æ¿ò
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ¾ï¿½ï¿½ï¿½ï¿½
         for (const auto& warningDef : allWarnings) {
             bool isActive = false;
 
-            // ¼ì²éµ±Ç°¾¯¸æÊÇ·ñ¼¤»î
+            // ï¿½ï¿½éµ±Ç°ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ñ¼¤»ï¿½
             for (const auto& warning : warnings) {
-                // ¼ì²éÏûÏ¢Æ¥Åä²¢ÇÒÊ±¼äÔÚ5ÃëÄÚ
+                // ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢Æ¥ï¿½ä²¢ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½5ï¿½ï¿½ï¿½ï¿½
                 if (warning.message == warningDef.message &&
                     warning.timestamp >= engine->getCurrentTime() - 5.0) {
                     isActive = true;
@@ -904,7 +937,7 @@ public:
             drawWarningBox(warningDef.message, warningDef.level, isActive, x, y);
             y += WARNING_BOX_HEIGHT + WARNING_SPACING;
 
-            // Ã¿6¸ö¾¯¸æ»»ÁĞ
+            // Ã¿6ï¿½ï¿½ï¿½ï¿½ï¿½æ»»ï¿½ï¿½
             if (y > WARNING_START_Y + 6 * (WARNING_BOX_HEIGHT + WARNING_SPACING)) {
                 x += WARNING_BOX_WIDTH + WARNING_SPACING;
                 y = WARNING_START_Y;
@@ -915,62 +948,62 @@ public:
     void drawFuelFlow() {
         double fuelFlow = engine->getFuelFlow();
 
-        // ¸ù¾İÈ¼ÓÍÁ÷ËÙ¾ö¶¨ÑÕÉ«
+        // ï¿½ï¿½ï¿½ï¿½È¼ï¿½ï¿½ï¿½ï¿½ï¿½Ù¾ï¿½ï¿½ï¿½ï¿½ï¿½É«
         COLORREF textColor, borderColor, bgColor;
         if (fuelFlow > 0) {
             if (fuelFlow > 50) {
-                // È¼ÓÍÁ÷ËÙ³¬ÏŞ - çúçêÉ«¾¯¸æ
-                textColor = RGB(255, 128, 0);   // çúçêÉ«ÎÄ×Ö
-                borderColor = RGB(255, 128, 0); // çúçêÉ«±ß¿ò
-                bgColor = RGB(40, 40, 40);      // °µ»ÒÉ«±³¾°
+                // È¼ï¿½ï¿½ï¿½ï¿½ï¿½Ù³ï¿½ï¿½ï¿½ - ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
+                textColor = RGB(255, 128, 0);   // ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
+                borderColor = RGB(255, 128, 0); // ï¿½ï¿½ï¿½ï¿½É«ï¿½ß¿ï¿½
+                bgColor = RGB(40, 40, 40);      // ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
             }
             else {
-                // Õı³£ÔËĞĞ×´Ì¬ - °×É«
-                textColor = WHITE;              // °×É«ÎÄ×Ö
-                borderColor = RGB(100, 100, 100); // Éî»ÒÉ«±ß¿ò
-                bgColor = RGB(40, 40, 40);       // °µ»ÒÉ«±³¾°
+                // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ - ï¿½ï¿½É«
+                textColor = WHITE;              // ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
+                borderColor = RGB(100, 100, 100); // ï¿½ï¿½ï¿½É«ï¿½ß¿ï¿½
+                bgColor = RGB(40, 40, 40);       // ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
             }
         }
         else {
-            // ·ÇÔËĞĞ×´Ì¬ - »ÒÉ«
-            textColor = RGB(150, 150, 150);   // »ÒÉ«ÎÄ×Ö
-            borderColor = RGB(100, 100, 100); // Éî»ÒÉ«±ß¿ò
-            bgColor = RGB(40, 40, 40);       // °µ»ÒÉ«±³¾°
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ - ï¿½ï¿½É«
+            textColor = RGB(150, 150, 150);   // ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
+            borderColor = RGB(100, 100, 100); // ï¿½ï¿½ï¿½É«ï¿½ß¿ï¿½
+            bgColor = RGB(40, 40, 40);       // ï¿½ï¿½ï¿½ï¿½É«ï¿½ï¿½ï¿½ï¿½
         }
 
-        // ÉèÖÃÎÄ±¾ÑùÊ½
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½Ê½
         settextstyle(24, 0, _T("Arial"));
         settextcolor(textColor);
 
-        // ´´½¨ÏÔÊ¾ÎÄ±¾
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾ï¿½Ä±ï¿½
         TCHAR flowText[64];
         _stprintf_s(flowText, _T("Fuel Flow: %.1f kg/h"), fuelFlow);
 
-        // ¼ÆËãÏÔÊ¾Î»ÖÃ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾Î»ï¿½ï¿½
         int x = 50;
         int y = 560;
         int width = 200;
         int height = 30;
 
-        // »æÖÆÍâ±ß¿òÒõÓ°Ğ§¹û
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ß¿ï¿½ï¿½ï¿½Ó°Ğ§ï¿½ï¿½
         setfillcolor(RGB(30, 30, 30));
         solidrectangle(x - 1, y - 1, x + width + 1, y + height + 1);
 
-        // »æÖÆÖ÷±³¾°
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         setfillcolor(bgColor);
         solidrectangle(x, y, x + width, y + height);
 
-        // »æÖÆ±ß¿ò
+        // ï¿½ï¿½ï¿½Æ±ß¿ï¿½
         setcolor(borderColor);
         rectangle(x, y, x + width, y + height);
 
-        // Èç¹û´¦ÓÚ»îÔ¾×´Ì¬£¬Ìí¼Ó×ó²àÖ¸Ê¾Ìõ
+        // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú»ï¿½Ô¾×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¸Ê¾ï¿½ï¿½
         if (fuelFlow > 0) {
             setfillcolor(borderColor);
             solidrectangle(x, y, x + 3, y + height);
         }
 
-        // »æÖÆÎÄ±¾£¨ÉÔÎ¢ÏòÓÒÆ«ÒÆÒÔ±Ü¿ª×ó²àÖ¸Ê¾Ìõ£©
+        // ï¿½ï¿½ï¿½ï¿½ï¿½Ä±ï¿½ï¿½ï¿½ï¿½ï¿½Î¢ï¿½ï¿½ï¿½ï¿½Æ«ï¿½ï¿½ï¿½Ô±Ü¿ï¿½ï¿½ï¿½ï¿½Ö¸Ê¾ï¿½ï¿½ï¿½ï¿½
         outtextxy(x + 10, y + (height - textheight(flowText)) / 2, flowText);
     }
 
@@ -992,7 +1025,7 @@ public:
         drawButton(decreaseThrust);
         drawStatus(engine->getIsStarting(), engine->getIsRunning());
         drawAllWarningBoxes();
-        drawFuelFlow();  // È·±£ÔÚÆäËûÔªËØÖ®ºó»æÖÆ
+        drawFuelFlow();  // È·ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ôªï¿½ï¿½Ö®ï¿½ï¿½ï¿½ï¿½ï¿½
 
         SetWorkingImage(NULL);
         putimage(0, 0, backBuffer);
@@ -1006,61 +1039,6 @@ public:
     }
 };
 
-// Êı¾İ¼ÇÂ¼Àà
-class DataLogger {
-private:
-    ofstream dataFile;
-    ofstream logFile;
-
-public:
-    DataLogger() {
-        time_t now = time(0);
-        unsigned long long timestamp = static_cast<unsigned long long>(now);
-        string timestampStr = to_string(timestamp);
-
-        string dataFileName = "data_" + timestampStr + ".csv";
-        dataFile.open(dataFileName, ios::out);
-        if (!dataFile.is_open()) {
-            throw runtime_error("Failed to open data file: " + dataFileName);
-        }
-
-        string logFileName = "log_" + timestampStr + ".txt";
-        logFile.open(logFileName, ios::out);
-        if (!logFile.is_open()) {
-            throw runtime_error("Failed to open log file: " + logFileName);
-        }
-
-        dataFile << "Time(s),N1(%),EGT(???),Fuel Flow(kg/h),Fuel Amount(kg)\n";
-        dataFile.flush();
-    }
-
-    ~DataLogger() {
-        if (dataFile.is_open()) {
-            dataFile.flush();
-            dataFile.close();
-        }
-        if (logFile.is_open()) {
-            logFile.flush();
-            logFile.close();
-        }
-    }
-
-    void logData(double time, double n1, double egt, double fuelFlow, double fuelAmount) {
-        dataFile << std::fixed
-            << std::setprecision(3) << time << ","
-            << std::setprecision(2) << n1 << ","
-            << std::setprecision(1) << egt << ","
-            << std::setprecision(2) << fuelFlow << ","
-            << std::setprecision(1) << fuelAmount << "\n";
-        dataFile.flush();
-    }
-
-    void logWarning(double time, const string& warning) {
-        logFile << std::fixed << std::setprecision(3)
-            << time << ": " << warning << "\n";
-        logFile.flush();
-    }
-};
 
 int main() {
     try {
@@ -1074,11 +1052,11 @@ int main() {
         ULONGLONG currentTime;
         const double fixedTimeStep = 1.0 / 200.0;  // 5ms
         double accumulator = 0.0;
-        double simulationTime = 0.0;  // Ä£ÄâÊ±¼ä
+        double simulationTime = 0.0;  // Ä£ï¿½ï¿½Ê±ï¿½ï¿½
 
         bool running = true;
 
-        // Ô¤ÈÈÑ­»·
+        // Ô¤ï¿½ï¿½Ñ­ï¿½ï¿½
         for (int i = 0; i < 100; i++) {
             engine.update(fixedTimeStep);
         }
@@ -1091,7 +1069,7 @@ int main() {
 
             accumulator += deltaTime;
 
-            // ´¦ÀíÊäÈë
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             while (MouseHit()) {
                 MOUSEMSG msg = GetMouseMsg();
                 if (msg.uMsg == WM_LBUTTONDOWN) {
@@ -1110,12 +1088,12 @@ int main() {
                 }
             }
 
-            // ÎïÀí¸üĞÂ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
             while (accumulator >= fixedTimeStep) {
                 engine.update(fixedTimeStep);
                 engine.checkWarnings(currentTime / 1000.0);
 
-                // ¼ÇÂ¼Êı¾İ - Ê¹ÓÃ¾«È·µÄÄ£ÄâÊ±¼ä
+                // ï¿½ï¿½Â¼ï¿½ï¿½ï¿½ï¿½ - Ê¹ï¿½Ã¾ï¿½È·ï¿½ï¿½Ä£ï¿½ï¿½Ê±ï¿½ï¿½
                 logger.logData(
                     simulationTime,
                     engine.getN1(),
@@ -1125,7 +1103,7 @@ int main() {
                 );
 
                 accumulator -= fixedTimeStep;
-                simulationTime += fixedTimeStep;  // Ö»ÔÚÕâÀï¸üĞÂÄ£ÄâÊ±¼ä
+                simulationTime += fixedTimeStep;  // Ö»ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ä£ï¿½ï¿½Ê±ï¿½ï¿½
             }
 
             gui.update();
@@ -1134,7 +1112,7 @@ int main() {
                 running = false;
             }
 
-            // ¾«È·¿ØÖÆÑ­»·Ê±¼ä
+            // ï¿½ï¿½È·ï¿½ï¿½ï¿½ï¿½Ñ­ï¿½ï¿½Ê±ï¿½ï¿½
             ULONGLONG endTime = GetTickCount64();
             ULONGLONG elapsedTime = endTime - currentTime;
             if (elapsedTime < 5) {
