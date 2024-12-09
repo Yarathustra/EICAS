@@ -50,6 +50,7 @@ private:
     Sensor* speedSensor2;
     Sensor* egtSensor1;
     Sensor* egtSensor2;
+    Sensor* fuelSensor;  // 添加燃油传感器
     double fuelFlow;
     double fuelAmount;
     bool isRunning;
@@ -105,6 +106,9 @@ public:
         if (fuelFlow > 0) {
             fuelAmount -= fuelFlow * timeStep;
             if (fuelAmount < 0) fuelAmount = 0;
+
+            // 更新燃油传感器的值
+            fuelSensor->setValue(fuelAmount);
         }
     }
     Engine() {
@@ -112,6 +116,7 @@ public:
         speedSensor2 = new Sensor();
         egtSensor1 = new Sensor();
         egtSensor2 = new Sensor();
+        fuelSensor = new Sensor();  // 初始化燃油传感器
         fuelFlow = 0;
         fuelAmount = 20000;
         isRunning = false;
@@ -315,17 +320,44 @@ public:
     }
 
     void checkWarnings(double currentTime) {
-        // 检查传感效性
+        // 检查传感器效性
         if (!speedSensor1->getValidity() && speedSensor2->getValidity()) {
-            addWarning("Speed Sensor 1 Failure", NORMAL, currentTime);
+            addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
         }
 
-        if (!speedSensor1->getValidity() && !speedSensor2->getValidity()) {
-            addWarning("Both Speed Sensors Failed - Engine Shutdown", WARNING, currentTime);
+        if (speedSensor1->getValidity() && !speedSensor2->getValidity()) {
+            addWarning("Engine N1 Sensor Failure", CAUTION, currentTime);
+        }
+
+        if (!egtSensor1->getValidity() && egtSensor2->getValidity()) {
+            addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
+        }
+
+        if (egtSensor1->getValidity() && !egtSensor2->getValidity()) {
+            addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
+        }
+
+        // 双发传感器故障检查
+        if ((!speedSensor1->getValidity() && !speedSensor2->getValidity()) ||
+            (!egtSensor1->getValidity() && !egtSensor2->getValidity())) {
+            addWarning("Dual Engine Sensor Failure - Shutdown", WARNING, currentTime);
             stop();
         }
 
-        // 检查转速超限
+        // 燃油系统检查
+        if (fuelAmount < 1000 && isRunning) {
+            addWarning("Low Fuel Level", CAUTION, currentTime);
+        }
+
+        if (!fuelSensor->getValidity()) {
+            addWarning("Fuel Sensor Failure", WARNING, currentTime);
+        }
+
+        if (fuelFlow > 50) {
+            addWarning("Fuel Flow Exceeded Limit", CAUTION, currentTime);
+        }
+
+        // 转速检查
         double n1Percent = getN1();
         if (n1Percent > 120) {
             addWarning("N1 Overspeed Level 2 - Engine Shutdown", WARNING, currentTime);
@@ -335,10 +367,10 @@ public:
             addWarning("N1 Overspeed Level 1", CAUTION, currentTime);
         }
 
-        // 检查温度超限
+        // 温度检查
         if (isStarting) {
             if (temperature > 1000) {
-                addWarning("EGT Overtemp Level 2 During Start - Engine Shutdown", WARNING, currentTime);
+                addWarning("EGT Overtemp Level 2 During Start - Shutdown", WARNING, currentTime);
                 stop();
             }
             else if (temperature > 850) {
@@ -347,21 +379,12 @@ public:
         }
         else if (isRunning) {
             if (temperature > 1100) {
-                addWarning("EGT Overtemp Level 2 - Engine Shutdown", WARNING, currentTime);
+                addWarning("EGT Overtemp Level 2 During Run - Shutdown", WARNING, currentTime);
                 stop();
             }
             else if (temperature > 950) {
-                addWarning("EGT Overtemp Level 1", CAUTION, currentTime);
+                addWarning("EGT Overtemp Level 1 During Run", CAUTION, currentTime);
             }
-        }
-
-        // 检查燃油系统
-        if (fuelAmount < 1000 && isRunning) {
-            addWarning("Low Fuel Level", CAUTION, currentTime);
-        }
-
-        if (fuelFlow > 50) {
-            addWarning("Fuel Flow Exceeded Limit", CAUTION, currentTime);
         }
     }
 
@@ -379,7 +402,7 @@ public:
         // 增加燃油流量
         fuelFlow += THRUST_FUEL_STEP;
 
-        // 生成3%~5%之间的随???变化率
+        // 生成3%~5%之间的随机变化率
         double changeRatio = THRUST_PARAM_MIN_CHANGE +
             (static_cast<double>(rand()) / RAND_MAX) *
             (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
@@ -481,6 +504,18 @@ public:
     double getCurrentTime() const {
         return static_cast<double>(GetTickCount64()) / 1000.0;
     }
+
+    // 添加燃油传感器的访问方法
+    Sensor* getFuelSensor() { return fuelSensor; }
+
+    // 析构函数中删除燃油传感器
+    ~Engine() {
+        delete speedSensor1;
+        delete speedSensor2;
+        delete egtSensor1;
+        delete egtSensor2;
+        delete fuelSensor;  // 删除燃油传感器
+    }
 };
 
 const double Engine::RATED_SPEED = 40000.0;
@@ -580,22 +615,29 @@ public:
         setfillcolor(RGB(20, 20, 20));
         fillcircle(x, y, radius);
 
-        // 对于转速表盘特殊处理
+        // 对于转速表盘和EGT表盘的特殊处理
         bool isN1Dial = _tcsstr(label, _T("N1")) != nullptr;
-        double displayValue = value;
-        double displayMaxValue = maxValue;
+        bool isEGTDial = _tcsstr(label, _T("EGT")) != nullptr;
+        double valueToDisplay = value;
+        double maxValueToDisplay = maxValue;
+        bool isStarting = engine->getIsStarting();
+        int arcDegrees = 360;  // 默认为360度
 
         if (isN1Dial) {
-            displayValue = (value / 40000.0) * 100;  // 40000是额定转速
-            displayMaxValue = 125;  // 最大125%
+            valueToDisplay = (value / 40000.0) * 100;  // 40000是额定转速
+            maxValueToDisplay = 125;  // 最大125%
+            arcDegrees = 210;  // N1表盘使用210度
+        }
+        else if (isEGTDial) {
+            maxValueToDisplay = 1200;  // EGT最大值1200度
+            arcDegrees = 210;   // EGT表盘也使用210度弧形
         }
 
-        // 绘制刻度 - 对于转速表盘只绘制0-210度的刻度
+        // 绘制刻度
         int startAngle = 90;  // 起始角度（12点钟位置）
-        int totalArcDegrees = isN1Dial ? 210 : 360;  // N1表盘210度，其他360度
 
         // 绘制主刻度线
-        for (int i = 0; i <= totalArcDegrees; i += 30) {
+        for (int i = 0; i <= arcDegrees; i += 30) {
             double angle = (startAngle - i) * PI / 180;
             int x1 = x + (radius - 10) * cos(angle);
             int y1 = y - (radius - 10) * sin(angle);
@@ -607,7 +649,7 @@ public:
         }
 
         // 绘制次刻度线
-        for (int i = 0; i <= totalArcDegrees; i += 6) {
+        for (int i = 0; i <= arcDegrees; i += 6) {
             if (i % 30 != 0) {  // 跳过主刻度位
                 double angle = (startAngle - i) * PI / 180;
                 int x1 = x + (radius - 5) * cos(angle);
@@ -621,20 +663,36 @@ public:
         }
 
         // 根据值的状态选择颜色
-        COLORREF valueColor = color;
+        COLORREF valueColor = RGB(255, 255, 255);  // 默认白色
         if (isN1Dial) {
-            if (displayValue > 105) valueColor = RGB(255, 128, 0);
-            if (displayValue > 120) valueColor = RGB(255, 0, 0);
+            if (valueToDisplay > 105) valueColor = RGB(255, 128, 0);
+            if (valueToDisplay > 120) valueColor = RGB(255, 0, 0);
         }
-        else {
-            if (displayValue > maxValue * 0.9) valueColor = RGB(255, 128, 0);
-            if (displayValue > maxValue * 0.95) valueColor = RGB(255, 0, 0);
+        else if (isEGTDial) {
+            if (isStarting) {
+                // 启动过程中的温度警告
+                if (valueToDisplay > 1000) {
+                    valueColor = RGB(255, 0, 0);      // 红色警告（超温2）
+                }
+                else if (valueToDisplay > 850) {
+                    valueColor = RGB(255, 128, 0);    // 琥珀色警告（超温1）
+                }
+            }
+            else {
+                // 稳态运行时的温度警告
+                if (valueToDisplay > 1100) {
+                    valueColor = RGB(255, 0, 0);      // 红色警告（超温4）
+                }
+                else if (valueToDisplay > 950) {
+                    valueColor = RGB(255, 128, 0);    // 琥珀色警告（超温3）
+                }
+            }
         }
 
         // 绘制值的弧形背景
-        double angleRatio = isN1Dial ? (displayValue / displayMaxValue) : (displayValue / maxValue);
+        double angleRatio = isN1Dial ? (valueToDisplay / maxValueToDisplay) : (valueToDisplay / maxValue);
         angleRatio = min(angleRatio, 1.0);
-        double angle = angleRatio * (isN1Dial ? 210 : 360);
+        double angle = angleRatio * arcDegrees;
 
         // 使用渐变色绘制弧形
         setfillcolor(valueColor);
@@ -676,9 +734,10 @@ public:
 
         // 绘制标签和数值
         settextstyle(20, 0, _T("Arial"));
+        settextcolor(valueColor);
         TCHAR valueText[32];
         if (isN1Dial) {
-            _stprintf_s(valueText, _T("%s: %.1f%%"), label, displayValue);
+            _stprintf_s(valueText, _T("%s: %.1f%%"), label, valueToDisplay);
         }
         else {
             _stprintf_s(valueText, _T("%s: %.1f"), label, value);
@@ -709,7 +768,7 @@ public:
     }
 
     void drawButton(const Button& btn) {
-        // 绘??按钮背景
+        // 绘制按钮背景
         setfillcolor(btn.pressed ? RGB(150, 150, 150) : btn.bgColor);
         solidroundrect(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, 10, 10);
 
@@ -762,9 +821,9 @@ public:
         COLORREF boxColor;
         switch (level) {
         case NORMAL: boxColor = WHITE; break;
-        case CAUTION: boxColor = RGB(255, 128, 0); break;
-        case WARNING: boxColor = RGB(255, 0, 0); break;
-        default: boxColor = RGB(128, 128, 128);
+        case CAUTION: boxColor = RGB(255, 128, 0); break;  // 琥珀色
+        case WARNING: boxColor = RGB(255, 0, 0); break;    // 红色
+        default: boxColor = RGB(128, 128, 128);            // 灰色
         }
 
         // 绘制警告框边框效果
@@ -798,46 +857,55 @@ public:
         int y = WARNING_START_Y;
         const vector<WarningMessage>& warnings = engine->getWarnings();
 
-        // 定义所有可能的警
+        // 定义所有可能的警告
         struct WarningDef {
             string message;
             WarningLevel level;
         };
 
         WarningDef allWarnings[] = {
-            {"Speed Sensor 1 Failure", NORMAL},
-            {"Single Engine Speed Sensor Failure", CAUTION},
-            {"EGT Sensor 1 Failure", NORMAL},
-            {"Single Engine EGT Sensor Failure", CAUTION},
-            {"Dual Engine Sensor Failure - Shutdown", WARNING},
-            {"Low Fuel Level", CAUTION},
-            {"Fuel Sensor Failure", WARNING},
-            {"Fuel Flow Exceeded Limit", CAUTION},
-            {"N1 Overspeed Level 1", CAUTION},
-            {"N1 Overspeed Level 2 - Shutdown", WARNING},
-            {"EGT Overtemp Level 1 During Start", CAUTION},
-            {"EGT Overtemp Level 2 During Start - Shutdown", WARNING},
-            {"EGT Overtemp Level 1 Stable", CAUTION},
-            {"EGT Overtemp Level 2 Stable - Shutdown"}
+            // 传感器异常
+            {"Single N1 Sensor Failure", NORMAL},           // 单个转速传感器故障
+            {"Engine N1 Sensor Failure", CAUTION},          // 单发转速传感器故障
+            {"Single EGT Sensor Failure", NORMAL},          // 单个EGT传感器故障
+            {"Engine EGT Sensor Failure", CAUTION},         // 单发EGT传感器故障
+            {"Dual Engine Sensor Failure - Shutdown", WARNING},  // 双发传感器故障
+
+            // 燃油异常
+            {"Low Fuel Level", CAUTION},                    // 燃油余量低
+            {"Fuel Sensor Failure", WARNING},               // 燃油余量故障
+            {"Fuel Flow Exceeded Limit", CAUTION},          // 燃油流速超限
+
+            // 转速异常
+            {"N1 Overspeed Level 1", CAUTION},             // 超转1
+            {"N1 Overspeed Level 2 - Engine Shutdown", WARNING}, // 超转2
+
+            // 温度异常
+            {"EGT Overtemp Level 1 During Start", CAUTION},      // 超温1
+            {"EGT Overtemp Level 2 During Start - Shutdown", WARNING}, // 超温2
+            {"EGT Overtemp Level 1 During Run", CAUTION},        // 超温3
+            {"EGT Overtemp Level 2 During Run - Shutdown", WARNING}    // 超温4
         };
 
         // 绘制所有警告框
-        for (int i = 0; i < 14; i++) {
+        for (const auto& warningDef : allWarnings) {
             bool isActive = false;
-            // 检查当前警告否激活
+
+            // 检查当前警告是否激活
             for (const auto& warning : warnings) {
-                if (warning.message == allWarnings[i].message &&
+                // 检查消息匹配并且时间在5秒内
+                if (warning.message == warningDef.message &&
                     warning.timestamp >= engine->getCurrentTime() - 5.0) {
                     isActive = true;
                     break;
                 }
             }
 
-            drawWarningBox(allWarnings[i].message, allWarnings[i].level, isActive, x, y);
+            drawWarningBox(warningDef.message, warningDef.level, isActive, x, y);
             y += WARNING_BOX_HEIGHT + WARNING_SPACING;
 
-            // 每7个警告换列
-            if (i == 6) {
+            // 每6个警告换列
+            if (y > WARNING_START_Y + 6 * (WARNING_BOX_HEIGHT + WARNING_SPACING)) {
                 x += WARNING_BOX_WIDTH + WARNING_SPACING;
                 y = WARNING_START_Y;
             }
@@ -850,13 +918,21 @@ public:
         // 根据燃油流速决定颜色
         COLORREF textColor, borderColor, bgColor;
         if (fuelFlow > 0) {
-            // 活跃状态 - 使用琥珀色
-            textColor = RGB(255, 180, 0);    // 明亮的琥珀色文字
-            borderColor = RGB(255, 140, 0);   // 深琥珀色边框
-            bgColor = RGB(80, 60, 20);       // 暗琥珀色背景
+            if (fuelFlow > 50) {
+                // 燃油流速超限 - 琥珀色警告
+                textColor = RGB(255, 128, 0);   // 琥珀色文字
+                borderColor = RGB(255, 128, 0); // 琥珀色边框
+                bgColor = RGB(40, 40, 40);      // 暗灰色背景
+            }
+            else {
+                // 正常运行状态 - 白色
+                textColor = WHITE;              // 白色文字
+                borderColor = RGB(100, 100, 100); // 深灰色边框
+                bgColor = RGB(40, 40, 40);       // 暗灰色背景
+            }
         }
         else {
-            // 非活跃状态 - 使用灰色
+            // 非运行状态 - 灰色
             textColor = RGB(150, 150, 150);   // 灰色文字
             borderColor = RGB(100, 100, 100); // 深灰色边框
             bgColor = RGB(40, 40, 40);       // 暗灰色背景
@@ -954,7 +1030,7 @@ public:
             throw runtime_error("Failed to open log file: " + logFileName);
         }
 
-        dataFile << "Time(s),N1(%),EGT(℃),Fuel Flow(kg/h),Fuel Amount(kg)\n";
+        dataFile << "Time(s),N1(%),EGT(???),Fuel Flow(kg/h),Fuel Amount(kg)\n";
         dataFile.flush();
     }
 
