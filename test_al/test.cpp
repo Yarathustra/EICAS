@@ -11,26 +11,12 @@
 #include <iomanip>  // 为setprecision锟斤拷fixed锟斤拷锟斤拷头锟侥硷拷
 #include <map>
 #include "DataLogger.h"  // 娣诲姞澶存枃浠跺寘鍚�
+#include "WarningTypes.h"  // 娣诲姞澶存枃浠跺寘鍚�
 using namespace std;
 
 #define PI 3.14159265358979323846
 
 // 募头痈婢�系统囟
-enum WarningLevel {
-    NORMAL,     // 色
-    CAUTION,    // 色
-    WARNING,    // 色
-    INVALID     // 效
-};
-
-struct WarningMessage {
-    string message;
-    WarningLevel level;
-    double timestamp;
-
-    WarningMessage(const string& msg, WarningLevel lvl, double time)
-        : message(msg), level(lvl), timestamp(time) {}
-};
 
 // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
 class Sensor {

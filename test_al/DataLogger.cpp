@@ -56,7 +56,7 @@ DataLogger::~DataLogger() {
 // 记录发动机运行数据
 void DataLogger::logData(double time, double n1, double egt, double fuelFlow, double fuelAmount) {
     if (dataFile.is_open()) {
-        dataFile << fixed << setprecision(2)
+        dataFile << fixed << setprecision(3)
             << time << ","          // 时间（秒）
             << n1 << ","            // N1转速（百分比）
             << egt << ","           // 排气温度（摄氏度）
