@@ -8,6 +8,7 @@
 #include <ctime>
 #include <string>
 #include <vector>
+#include <iomanip>  // 为setprecision和fixed添加头文件
 using namespace std;
 
 #define PI 3.14159265358979323846
@@ -81,7 +82,7 @@ private:
     }
 
 public:
-    // 在Engine类中???
+    // 在Engine类中
     Sensor* getSpeedSensor2() { return speedSensor2; }
     Sensor* getEgtSensor1() { return egtSensor1; }
     Sensor* getEgtSensor2() { return egtSensor2; }
@@ -378,7 +379,7 @@ public:
         // 增加燃油流量
         fuelFlow += THRUST_FUEL_STEP;
 
-        // 生成3%~5%之间的随机变化率
+        // 生成3%~5%之间的随???变化率
         double changeRatio = THRUST_PARAM_MIN_CHANGE +
             (static_cast<double>(rand()) / RAND_MAX) *
             (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
@@ -473,7 +474,7 @@ public:
             egtSensor1->setValidity(false);
             egtSensor2->setValidity(false);
             break;
-            // ... 其他障???拟
+            // ... 其他障拟
         }
     }
 
@@ -591,7 +592,7 @@ public:
 
         // 绘制刻度 - 对于转速表盘只绘制0-210度的刻度
         int startAngle = 90;  // 起始角度（12点钟位置）
-        int totalArcDegrees = isN1Dial ? 210 : 360;  // N1表盘210度，其??360度
+        int totalArcDegrees = isN1Dial ? 210 : 360;  // N1表盘210度，其他360度
 
         // 绘制主刻度线
         for (int i = 0; i <= totalArcDegrees; i += 30) {
@@ -708,7 +709,7 @@ public:
     }
 
     void drawButton(const Button& btn) {
-        // 绘制按钮背景
+        // 绘??按钮背景
         setfillcolor(btn.pressed ? RGB(150, 150, 150) : btn.bgColor);
         solidroundrect(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, 10, 10);
 
@@ -797,7 +798,7 @@ public:
         int y = WARNING_START_Y;
         const vector<WarningMessage>& warnings = engine->getWarnings();
 
-        // 定义所有可能的警??
+        // 定义所有可能的警
         struct WarningDef {
             string message;
             WarningLevel level;
@@ -869,7 +870,7 @@ public:
         TCHAR flowText[64];
         _stprintf_s(flowText, _T("Fuel Flow: %.1f kg/h"), fuelFlow);
 
-        // ???算显示位置
+        // 计算显示位置
         int x = 50;
         int y = 560;
         int width = 200;
@@ -940,19 +941,48 @@ public:
         time_t now = time(0);
         unsigned long long timestamp = static_cast<unsigned long long>(now);
         string timestampStr = to_string(timestamp);
-        dataFile.open("data_" + timestampStr + ".csv");
-        logFile.open("log_" + timestampStr + ".txt");
 
-        dataFile << "Time,N1,EGT,Fuel Flow,Fuel Amount\n";
+        string dataFileName = "data_" + timestampStr + ".csv";
+        dataFile.open(dataFileName, ios::out);
+        if (!dataFile.is_open()) {
+            throw runtime_error("Failed to open data file: " + dataFileName);
+        }
+
+        string logFileName = "log_" + timestampStr + ".txt";
+        logFile.open(logFileName, ios::out);
+        if (!logFile.is_open()) {
+            throw runtime_error("Failed to open log file: " + logFileName);
+        }
+
+        dataFile << "Time(s),N1(%),EGT(℃),Fuel Flow(kg/h),Fuel Amount(kg)\n";
+        dataFile.flush();
+    }
+
+    ~DataLogger() {
+        if (dataFile.is_open()) {
+            dataFile.flush();
+            dataFile.close();
+        }
+        if (logFile.is_open()) {
+            logFile.flush();
+            logFile.close();
+        }
     }
 
     void logData(double time, double n1, double egt, double fuelFlow, double fuelAmount) {
-        dataFile << time << "," << n1 << "," << egt << ","
-            << fuelFlow << "," << fuelAmount << "\n";
+        dataFile << std::fixed
+            << std::setprecision(3) << time << ","
+            << std::setprecision(2) << n1 << ","
+            << std::setprecision(1) << egt << ","
+            << std::setprecision(2) << fuelFlow << ","
+            << std::setprecision(1) << fuelAmount << "\n";
+        dataFile.flush();
     }
 
     void logWarning(double time, const string& warning) {
-        logFile << static_cast<long long>(time) << ": " << warning << "\n";
+        logFile << std::fixed << std::setprecision(3)
+            << time << ": " << warning << "\n";
+        logFile.flush();
     }
 };
 
@@ -966,8 +996,9 @@ int main() {
 
         ULONGLONG lastUpdateTime = GetTickCount64();
         ULONGLONG currentTime;
-        const double fixedTimeStep = 1.0 / 200.0;  // 同样使用200Hz的更新频率
+        const double fixedTimeStep = 1.0 / 200.0;  // 5ms
         double accumulator = 0.0;
+        double simulationTime = 0.0;  // 模拟时间
 
         bool running = true;
 
@@ -978,8 +1009,8 @@ int main() {
 
         while (running) {
             currentTime = GetTickCount64();
-            double deltaTime = (currentTime - lastUpdateTime) / 1000.0;  // 改名为deltaTime
-            if (deltaTime > 0.25) deltaTime = 0.25;  // 防止过大的时间步长
+            double deltaTime = (currentTime - lastUpdateTime) / 1000.0;
+            if (deltaTime > 0.25) deltaTime = 0.25;
             lastUpdateTime = currentTime;
 
             accumulator += deltaTime;
@@ -1003,11 +1034,22 @@ int main() {
                 }
             }
 
-            // 物理更新也使用5ms的固定时间步长
+            // 物理更新
             while (accumulator >= fixedTimeStep) {
                 engine.update(fixedTimeStep);
                 engine.checkWarnings(currentTime / 1000.0);
+
+                // 记录数据 - 使用精确的模拟时间
+                logger.logData(
+                    simulationTime,
+                    engine.getN1(),
+                    engine.getTemperature(),
+                    engine.getFuelFlow(),
+                    engine.getFuelAmount()
+                );
+
                 accumulator -= fixedTimeStep;
+                simulationTime += fixedTimeStep;  // 只在这里更新模拟时间
             }
 
             gui.update();
@@ -1018,9 +1060,9 @@ int main() {
 
             // 精确控制循环时间
             ULONGLONG endTime = GetTickCount64();
-            ULONGLONG elapsedTime = endTime - currentTime;  // 改名为elapsedTime
-            if (elapsedTime < 5) {  // 如果一帧用时少于5ms
-                Sleep(5 - elapsedTime);  // 等待剩余时间
+            ULONGLONG elapsedTime = endTime - currentTime;
+            if (elapsedTime < 5) {
+                Sleep(5 - elapsedTime);
             }
         }
 
