@@ -54,6 +54,7 @@ private:
     bool isRunning;
     bool isStarting;
     bool isStopping;  // 添加停车状态标志
+    bool isThrusting;  // 添加推力变化状态标志
     double stopStartTime;  // 记录开始停车的时间
     static const double RATED_SPEED; // 额定转速
     static const double T0;  // 初始温度
@@ -67,6 +68,9 @@ private:
     vector<WarningMessage> warnings;
     double lastWarningTime;
     double accumulatedTime;  // 添加累积时间变量
+    const double THRUST_FUEL_STEP = 1.0;  // 每次推力变化的燃油流量步进值
+    const double THRUST_PARAM_MIN_CHANGE = 0.03;  // 最小变化率 3%
+    const double THRUST_PARAM_MAX_CHANGE = 0.05;  // 最大变化率 5%
 
     void addWarning(const string& message, WarningLevel level, double currentTime) {
         if (currentTime - lastWarningTime >= 5.0 || warnings.empty() ||
@@ -77,7 +81,7 @@ private:
     }
 
 public:
-    // 在Engine类中添加
+    // 在Engine类中???
     Sensor* getSpeedSensor2() { return speedSensor2; }
     Sensor* getEgtSensor1() { return egtSensor1; }
     Sensor* getEgtSensor2() { return egtSensor2; }
@@ -121,6 +125,7 @@ public:
         accumulatedTime = 0.0;  // 初始化累积时间
         isStopping = false;
         stopStartTime = 0;
+        isThrusting = false;  // 初始化推力状态
 
         // 初始化EGT传感器的初始值为环境温度
         egtSensor1->setValue(T0);
@@ -130,6 +135,7 @@ public:
     Sensor* getSpeedSensor1() { return speedSensor1; }
 
     void updateStartPhase(double timeStep) {
+        isThrusting = false;
         // 累加时间
         accumulatedTime += timeStep;
 
@@ -144,7 +150,7 @@ public:
             speedSensor1->setValue(speed);
             speedSensor2->setValue(speed);
             fuelFlow = 5.0 * accumulatedTime;
-            temperature = T0 + 100.0 * accumulatedTime;  // 2秒时温度应该是 T0 + 200
+            temperature = T0;  // 2秒时温度应该是 T0 
 
             egtSensor1->setValue(temperature);
             egtSensor2->setValue(temperature);
@@ -153,7 +159,7 @@ public:
         }
         else {
             // 启动阶段2：对数增长
-            double t = accumulatedTime - 2.0;
+            double t = accumulatedTime - 2.0;  // t从0开始计时
             double speed = 20000.0 + 23000.0 * log10(1.0 + t);
             N1 = (speed / RATED_SPEED) * 100.0;
 
@@ -161,8 +167,8 @@ public:
             speedSensor2->setValue(speed);
             fuelFlow = 10.0 + 42.0 * log10(1.0 + t);
 
-            // 修改温度计算，确保与阶段1连续
-            temperature = (T0 + 200.0) + 650.0 * log10(1.0 + t);
+            // 温度计算公式为 T = 900*lg(t-1) + T0
+            temperature = 900.0 * log10(t + 1.0) + T0;
 
             double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
             double displaySpeed = speed * randFactor;
@@ -199,7 +205,13 @@ public:
             updateStartPhase(timeStep);
         }
         else if (isRunning) {
-            updateRunningPhase(timeStep);
+            // 根据燃油流量断是否处于新的运行阶段
+            if (isThrusting) {
+                updateNewRunningPhase(timeStep);
+            }
+            else {
+                updateRunningPhase(timeStep);
+            }
         }
         else if (isStopping) {
             updateStopPhase(timeStep);
@@ -232,14 +244,40 @@ public:
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // 更新燃油流量
+        // 更新燃油量
         if (fuelFlow > 0) {
             fuelFlow = 40.0 * randFactor;  // 基准燃油流量40
             updateFuelFlow();
         }
     }
 
+    void updateNewRunningPhase(double timeStep) {
+
+        // 添加小幅随机波动（1%~3%）
+        double randFactor = 1.0 + (rand() % 4 - 2) / 100.0;
+
+        // 更新传感器显示值
+        double speed = (N1 / 100.0) * RATED_SPEED * randFactor;
+        speedSensor1->setValue(speed);
+        speedSensor2->setValue(speed);
+
+        egtSensor1->setValue(temperature * randFactor);
+        egtSensor2->setValue(temperature * randFactor);
+
+        // 更新燃油流量
+        if (fuelFlow > 0) {
+            updateFuelFlow();
+        }
+
+        // 调试输出
+        std::cout << "New Running Phase - N1: " << N1
+            << "%, Temp: " << temperature
+            << ", Fuel Flow: " << fuelFlow
+            << ", Time Step: " << timeStep << std::endl;
+    }
+
     void updateStopPhase(double timeStep) {
+        isThrusting = false;
         double elapsedStopTime = accumulatedTime - stopStartTime;
 
         if (elapsedStopTime >= STOP_DURATION) {
@@ -276,7 +314,7 @@ public:
     }
 
     void checkWarnings(double currentTime) {
-        // 检查传感器效性
+        // 检查传感效性
         if (!speedSensor1->getValidity() && speedSensor2->getValidity()) {
             addWarning("Speed Sensor 1 Failure", NORMAL, currentTime);
         }
@@ -331,23 +369,91 @@ public:
     }
 
     void increaseThrust() {
-        if (isRunning) {
-            fuelFlow += 1.0;
-            double randFactor = 1.0 + (rand() % 3 + 3) / 100.0;
-            speedSensor1->setValue(speedSensor1->getValue() * randFactor);
-            speedSensor2->setValue(speedSensor2->getValue() * randFactor);
-            temperature *= randFactor;
+        if (!isRunning || isStarting || isStopping) {
+            cout << "Not in running state" << endl;
+            return;  // 只在稳定运行状态下允许调节推力
         }
+        isThrusting = true;
+
+        // 增加燃油流量
+        fuelFlow += THRUST_FUEL_STEP;
+
+        // 生成3%~5%之间的随机变化率
+        double changeRatio = THRUST_PARAM_MIN_CHANGE +
+            (static_cast<double>(rand()) / RAND_MAX) *
+            (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
+
+        // 更新转速和温度
+        double baseSpeed = RATED_SPEED * N1 / 100.0;  // 基准转速
+        double newSpeed = baseSpeed * (1.0 + changeRatio);
+        N1 = (newSpeed / RATED_SPEED) * 100.0;
+
+
+        // 限制N1不超过100%
+        if (N1 > 125.0) {
+            N1 = 125.0;
+            newSpeed = RATED_SPEED;
+        }
+
+        // 更新传感器显示值
+        speedSensor1->setValue(newSpeed);
+        speedSensor2->setValue(newSpeed);
+
+        // 更新温度
+        temperature = temperature * (1.0 + changeRatio);
+
+        // 更新EGT传感器
+        egtSensor1->setValue(temperature);
+        egtSensor2->setValue(temperature);
+
+        // 调试输出
+        std::cout << "Thrust increased - N1: " << N1
+            << "%, Temp: " << temperature
+            << ", Fuel Flow: " << fuelFlow << std::endl;
     }
 
     void decreaseThrust() {
-        if (isRunning && fuelFlow > 1.0) {
-            fuelFlow -= 1.0;
-            double randFactor = 1.0 - (rand() % 3 + 3) / 100.0;
-            speedSensor1->setValue(speedSensor1->getValue() * randFactor);
-            speedSensor2->setValue(speedSensor2->getValue() * randFactor);
-            temperature *= randFactor;
+        if (!isRunning || isStarting || isStopping) {
+            return;  // 只在稳定运行状态下允许调节推力
         }
+        isThrusting = true;
+
+        // 确保燃油流量不会低于最小值
+        if (fuelFlow > THRUST_FUEL_STEP) {
+            fuelFlow -= THRUST_FUEL_STEP;
+        }
+
+        // 生成3%~5%之间的随机变化率
+        double changeRatio = THRUST_PARAM_MIN_CHANGE +
+            (static_cast<double>(rand()) / RAND_MAX) *
+            (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
+
+        // 更新转速和温度
+        double baseSpeed = RATED_SPEED * N1 / 100.0;  // 基准转速
+        double newSpeed = baseSpeed * (1.0 - changeRatio);
+        N1 = (newSpeed / RATED_SPEED) * 100.0;
+
+        // 限制N1不低于最小值（比如60%）
+        if (N1 < 0) {
+            N1 = 0;
+            newSpeed = 0;
+        }
+
+        // 更新传感器显示值
+        speedSensor1->setValue(newSpeed);
+        speedSensor2->setValue(newSpeed);
+
+        // 更新温度，基准温度850度
+        temperature = temperature * (1.0 - changeRatio);
+
+        // 更新EGT传感器
+        egtSensor1->setValue(temperature);
+        egtSensor2->setValue(temperature);
+
+        // 调试输出
+        std::cout << "Thrust decreased - N1: " << N1
+            << "%, Temp: " << temperature
+            << ", Fuel Flow: " << fuelFlow << std::endl;
     }
 
     // 添加传感器故障模拟方法
@@ -367,7 +473,7 @@ public:
             egtSensor1->setValidity(false);
             egtSensor2->setValidity(false);
             break;
-            // ... 其他故障模拟
+            // ... 其他障???拟
         }
     }
 
@@ -485,7 +591,7 @@ public:
 
         // 绘制刻度 - 对于转速表盘只绘制0-210度的刻度
         int startAngle = 90;  // 起始角度（12点钟位置）
-        int totalArcDegrees = isN1Dial ? 210 : 360;  // N1表盘210度，其他360度
+        int totalArcDegrees = isN1Dial ? 210 : 360;  // N1表盘210度，其??360度
 
         // 绘制主刻度线
         for (int i = 0; i <= totalArcDegrees; i += 30) {
@@ -501,7 +607,7 @@ public:
 
         // 绘制次刻度线
         for (int i = 0; i <= totalArcDegrees; i += 6) {
-            if (i % 30 != 0) {  // 跳过主刻度位置
+            if (i % 30 != 0) {  // 跳过主刻度位
                 double angle = (startAngle - i) * PI / 180;
                 int x1 = x + (radius - 5) * cos(angle);
                 int y1 = y - (radius - 5) * sin(angle);
@@ -691,7 +797,7 @@ public:
         int y = WARNING_START_Y;
         const vector<WarningMessage>& warnings = engine->getWarnings();
 
-        // 定义所有可能的警告
+        // 定义所有可能的警??
         struct WarningDef {
             string message;
             WarningLevel level;
@@ -717,7 +823,7 @@ public:
         // 绘制所有警告框
         for (int i = 0; i < 14; i++) {
             bool isActive = false;
-            // 检查当前警告??否激活
+            // 检查当前警告否激活
             for (const auto& warning : warnings) {
                 if (warning.message == allWarnings[i].message &&
                     warning.timestamp >= engine->getCurrentTime() - 5.0) {
@@ -763,7 +869,7 @@ public:
         TCHAR flowText[64];
         _stprintf_s(flowText, _T("Fuel Flow: %.1f kg/h"), fuelFlow);
 
-        // 计算显示位置
+        // ???算显示位置
         int x = 50;
         int y = 560;
         int width = 200;
