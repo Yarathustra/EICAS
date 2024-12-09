@@ -1,4 +1,4 @@
-// EICAS.cpp
+// test.cpp
 #include <iostream>
 #include <windows.h>
 #include <graphics.h>
@@ -12,33 +12,13 @@
 #include <map>
 #include "DataLogger.h"  // 娣诲姞澶存枃浠跺寘鍚�
 #include "WarningTypes.h"  // 娣诲姞澶存枃浠跺寘鍚�
+#include "Sensor.h"  // 娣诲姞澶存枃浠跺寘鍚�
 using namespace std;
 
 #define PI 3.14159265358979323846
 
 // 募头痈婢�系统囟
 
-// 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-class Sensor {
-protected:
-    double value;
-    bool isValid;
-public:
-    Sensor() : value(0), isValid(true) {}
-    virtual double getValue() { 
-        // 当传感器失效时返回0
-        return isValid ? value : 0.0; 
-    }
-    virtual void setValue(double v) { value = v; }
-    bool getValidity() { return isValid; }
-    void setValidity(bool valid) { 
-        isValid = valid;
-        // 如果传感器变为无效，立即将值设为0
-        if (!valid) {
-            value = 0.0;
-        }
-    }
-};
 
 // 然 Engine 确使 DataLogger
 class Engine {
