@@ -251,7 +251,7 @@ public:
 
         // 燃油流量
         if (fuelFlow > 0) {
-            fuelFlow = 40.0 * randFactor;  // 40的基础燃油流量
+            fuelFlow = 40 * randFactor;  // 40的基础燃油流量
             updateFuelFlow();
         }
     }
@@ -450,7 +450,7 @@ public:
         }
         isThrusting = true;
 
-        // 保燃油流量不会低于最小值
+        // 保燃油量不会低于最小值
         if (fuelFlow > THRUST_FUEL_STEP) {
             fuelFlow -= THRUST_FUEL_STEP;
         }
@@ -501,7 +501,7 @@ public:
         case 2: // 单个EGT传感器故障
             egtSensor1->setValidity(false);
             break;
-        case 3: // 双EGT传感器故障
+        case 3: // 双EGT传���器故障
             egtSensor1->setValidity(false);
             egtSensor2->setValidity(false);
             break;
@@ -524,7 +524,7 @@ public:
         delete egtSensor2;
         delete fuelSensor;  // 删除燃油传感器
         if (logger) {
-            delete logger;  // 安全删除日��记录器
+            delete logger;  // 安全删除日志记录器
             logger = nullptr;
         }
         lastWarningTimes.clear();
@@ -575,7 +575,7 @@ public:
         ULONGLONG lastFrameTime;
         IMAGE* backBuffer;
         Engine* engine;
-        // 确保 engine 指针有效
+        // 确保 engine 指针���效
 
     public:
         struct Button {
@@ -662,7 +662,7 @@ public:
             cleardevice();
             SetWorkingImage(NULL);
 
-            // 预热图��系统
+            // 预热图系统
             BeginBatchDraw();
             for (int i = 0; i < 5; i++) {
                 cleardevice();
@@ -950,7 +950,7 @@ public:
             int y = WARNING_START_Y;
             const vector<WarningMessage>& warnings = engine->getWarnings();
 
-            // 定义所有可能的警��
+            // 定义所有可能的警
             struct WarningDef {
                 string message;
                 WarningLevel level;
@@ -1138,7 +1138,7 @@ public:
             drawFuelFlow();  // 确保燃油流量显示在所有元素之后
             drawFuelAmount();  // 添加油量显示
 
-            // 绘制警告测试按钮
+            // 绘制警告测���按钮
             for (int i = 0; i < 14; i++) {
                 drawButton(warningButtons[i]);
             }
@@ -1201,6 +1201,10 @@ public:
                     case 6: // High Fuel Flow
                         if (engine->getIsRunning()) {
                             engine->setFuelFlow(52.0);  // 设置超过燃油流量限制
+                            engine->checkWarnings(engine->getCurrentTime());
+                            engine->increaseThrust();
+                            engine->decreaseThrust();
+                            //此处认为故障时可能是漏油不改变温度和转速
                         }
                         break;
                     case 7: // N1 Overspeed L1
