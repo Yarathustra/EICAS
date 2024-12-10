@@ -96,7 +96,13 @@ public:
     void updateFuelFlow() {
         if (fuelFlow > 0) {
             fuelAmount -= fuelFlow * timeStep;
-            if (fuelAmount < 0) fuelAmount = 0;
+            if (fuelAmount <= 0) {
+                fuelAmount = 0;
+                // 燃油耗尽，自动停止发动机
+                stop();
+                // 添加燃油耗尽警告
+                addWarning("Fuel Exhausted - Engine Shutdown", WARNING, getCurrentTime());
+            }
 
             // 更新燃油传感器的值
             fuelSensor->setValue(fuelAmount);
@@ -444,7 +450,7 @@ public:
         }
         isThrusting = true;
 
-        // 确保燃油流量不会低于最小值
+        // 保燃油流量不会低于最小值
         if (fuelFlow > THRUST_FUEL_STEP) {
             fuelFlow -= THRUST_FUEL_STEP;
         }
@@ -482,7 +488,7 @@ public:
             << ", Fuel Flow: " << fuelFlow << std::endl;
     }
 
-    // 模拟传感器故障的方法
+    // 模传感器故障的方法
     void simulateSensorFailure(int sensorType) {
         switch (sensorType) {
         case 0: // 单个N1传感器故障
@@ -507,7 +513,7 @@ public:
         return static_cast<double>(GetTickCount64()) / 1000.0;
     }
 
-    // 获取燃油传感器的���法
+    // 获取燃油传感器的方法
     Sensor* getFuelSensor() { return fuelSensor; }
 
     // 析构函数，释放资源
@@ -524,7 +530,7 @@ public:
         lastWarningTimes.clear();
     }
 
-    // 添加新的测试方法
+    // 添加新的测试方��
     void setFuelAmount(double amount) { fuelAmount = amount; }
     void setFuelFlow(double flow) { fuelFlow = flow; }
     void setN1(double value) { N1 = value; }
@@ -559,7 +565,7 @@ public:
         static const int DIAL_SPACING_Y = 180;   // 表盘垂直间距
         static const int DIAL_START_X = 100;     // 表盘起始X坐标
         static const int DIAL_START_Y = 150;     // 表盘起始Y坐标
-        static const int WARNING_BOX_WIDTH = 380;  // 警告框宽度
+        static const int WARNING_BOX_WIDTH = 380;  // 警告���宽度
         static const int WARNING_BOX_HEIGHT = 30;  // 警告框高度
         static const int WARNING_START_X = 750;    // 警告框起始X坐标
         static const int WARNING_START_Y = 100;    // 警告框起始Y坐标
@@ -615,7 +621,7 @@ public:
                     _T("EGT Start L2"),   // 启动时EGT超温二级
                     _T("EGT Run L1"),     // 运行时EGT超温一级
                     _T("EGT Run L2"),     // 运行时EGT超温二级
-                    _T("Reset Sensors")   // 重置所有传感器
+                    _T("Reset All")   // 重置所有
             };
 
             // 设置按钮位置和样式
@@ -747,7 +753,7 @@ public:
                         valueColor = RGB(255, 0, 0);      // 红色警告（级别2）
                     }
                     else if (valueToDisplay > 850) {
-                        valueColor = RGB(255, 128, 0);    // ���色警告（级别1）
+                        valueColor = RGB(255, 128, 0);    // 橙色警告（级别1）
                     }
                 }
                 else {
@@ -937,7 +943,7 @@ public:
             WarningDef allWarnings[] = {
                 // 传感器故障
                 {"Single N1 Sensor Failure", NORMAL},           // 单个N1传感器故障
-                {"Engine N1 Sensor Failure", CAUTION},          // ���N1传感器故障
+                {"Engine N1 Sensor Failure", CAUTION},          // N1传感器故障
                 {"Single EGT Sensor Failure", NORMAL},          // 单个EGT传感器故障
                 {"Engine EGT Sensor Failure", CAUTION},         // 双EGT传感器故障
                 {"Dual Engine Sensor Failure - Shutdown", WARNING},  // 双传感器故障
@@ -1015,7 +1021,7 @@ public:
 
             // 格式化显示文本
             TCHAR flowText[64];
-            _stprintf_s(flowText, _T("Fuel Flow: %.1f kg/h"), fuelFlow);
+            _stprintf_s(flowText, _T("Fuel Flow: %.1f L/s"), fuelFlow);
 
             // 设置显示位置
             int x = 50;
@@ -1045,6 +1051,49 @@ public:
             outtextxy(x + 10, y + (height - textheight(flowText)) / 2, flowText);
         }
 
+        void drawFuelAmount() {
+            double fuelAmount = engine->getFuelAmount();
+
+            // 设置油量显示的颜色
+            COLORREF textColor;
+            if (fuelAmount <= 0) {
+                textColor = RGB(255, 0, 0);  // 红色
+            } else if (fuelAmount < 1000) {
+                textColor = RGB(255, 191, 0);  // 琥珀色
+            } else {
+                textColor = WHITE;  // 白色
+            }
+
+            // 设置文本样式
+            settextstyle(24, 0, _T("Arial"));
+            settextcolor(textColor);
+
+            // 格式化显示文本
+            TCHAR amountText[64];
+            _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
+
+            // 设置显示位置
+            int x = 350;
+            int y = 560; 
+            int width = 270;
+            int height = 30;
+
+            // 绘制背景框
+            setfillcolor(RGB(30, 30, 30));
+            solidrectangle(x - 1, y - 1, x + width + 1, y + height + 1);
+
+            // 绘制背景色
+            setfillcolor(RGB(40, 40, 40));
+            solidrectangle(x, y, x + width, y + height);
+
+            // 绘制边框
+            setcolor(RGB(100, 100, 100));
+            rectangle(x, y, x + width, y + height);
+
+            // 绘制文本，微调位置使其居中
+            outtextxy(x + 10, y + (height - textheight(amountText)) / 2, amountText);
+        }
+
         void update() {
             ULONGLONG currentTime = GetTickCount64();
             ULONGLONG deltaTime = currentTime - lastFrameTime;
@@ -1064,8 +1113,9 @@ public:
             drawStatus(engine->getIsStarting(), engine->getIsRunning());
             drawAllWarningBoxes();
             drawFuelFlow();  // 确保燃油流量显示在所有元素之后
+            drawFuelAmount();  // 添加油量显示
 
-            // 绘制警告测试按钮
+            // 绘制警告���试按钮
             for (int i = 0; i < 14; i++) {
                 drawButton(warningButtons[i]);
             }
