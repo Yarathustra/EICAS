@@ -524,7 +524,7 @@ public:
         delete egtSensor2;
         delete fuelSensor;  // 删除燃油传感器
         if (logger) {
-            delete logger;  // 安全删除日志记录器
+            delete logger;  // 安全删除日��记录器
             logger = nullptr;
         }
         lastWarningTimes.clear();
@@ -1069,10 +1069,13 @@ public:
 
         void drawFuelAmount() {
             double fuelAmount = engine->getFuelAmount();
+            bool isFuelSensorValid = engine->getFuelSensor()->getValidity();
 
             // 设置油量显示的颜色
             COLORREF textColor;
-            if (fuelAmount <= 0) {
+            if (!isFuelSensorValid) {
+                textColor = RGB(0, 255, 0);  // 传感器失效时显示绿色
+            } else if (fuelAmount <= 0) {
                 textColor = RGB(255, 0, 0);  // 红色
             } else if (fuelAmount < 1000) {
                 textColor = RGB(255, 191, 0);  // 琥珀色
@@ -1086,7 +1089,11 @@ public:
 
             // 格式化显示文本
             TCHAR amountText[64];
-            _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
+            if (!isFuelSensorValid) {
+                _stprintf_s(amountText, _T("Fuel Amount: -- L"));
+            } else {
+                _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
+            }
 
             // 设置显示位置
             int x = 350;
