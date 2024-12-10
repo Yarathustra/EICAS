@@ -530,7 +530,7 @@ public:
         lastWarningTimes.clear();
     }
 
-    // 添加新的测试方��
+    // 添加新的测试方法
     void setFuelAmount(double amount) { fuelAmount = amount; }
     void setFuelFlow(double flow) { fuelFlow = flow; }
     void setN1(double value) { N1 = value; }
@@ -564,8 +564,8 @@ public:
         static const int DIAL_SPACING_X = 180;   // 表盘水平间距
         static const int DIAL_SPACING_Y = 180;   // 表盘垂直间距
         static const int DIAL_START_X = 100;     // 表盘起始X坐标
-        static const int DIAL_START_Y = 150;     // 表盘起始Y坐标
-        static const int WARNING_BOX_WIDTH = 380;  // 警告���宽度
+        static const int DIAL_START_Y = 150;     // ���盘起始Y坐标
+        static const int WARNING_BOX_WIDTH = 380;  // 警告框宽度
         static const int WARNING_BOX_HEIGHT = 30;  // 警告框高度
         static const int WARNING_START_X = 750;    // 警告框起始X坐标
         static const int WARNING_START_Y = 100;    // 警告框起始Y坐标
@@ -1053,10 +1053,13 @@ public:
 
         void drawFuelAmount() {
             double fuelAmount = engine->getFuelAmount();
+            bool isFuelSensorValid = engine->getFuelSensor()->getValidity();
 
             // 设置油量显示的颜色
             COLORREF textColor;
-            if (fuelAmount <= 0) {
+            if (!isFuelSensorValid) {
+                textColor = RGB(0, 255, 0);  // 传感器失效时显示绿色
+            } else if (fuelAmount <= 0) {
                 textColor = RGB(255, 0, 0);  // 红色
             } else if (fuelAmount < 1000) {
                 textColor = RGB(255, 191, 0);  // 琥珀色
@@ -1070,7 +1073,11 @@ public:
 
             // 格式化显示文本
             TCHAR amountText[64];
-            _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
+            if (!isFuelSensorValid) {
+                _stprintf_s(amountText, _T("Fuel Amount: -- L"));
+            } else {
+                _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
+            }
 
             // 设置显示位置
             int x = 350;
@@ -1115,7 +1122,7 @@ public:
             drawFuelFlow();  // 确保燃油流量显示在所有元素之后
             drawFuelAmount();  // 添加油量显示
 
-            // 绘制警告���试按钮
+            // 绘制警告测试按钮
             for (int i = 0; i < 14; i++) {
                 drawButton(warningButtons[i]);
             }
