@@ -314,25 +314,35 @@ public:
 
     void checkWarnings(double currentTime) {
         // 检查传感器有效性
-        if (!speedSensor1->getValidity() && speedSensor2->getValidity()) {
+        bool n1L1Failed = !speedSensor1->getValidity();
+        bool n1L2Failed = !speedSensor2->getValidity();
+        bool egtL1Failed = !egtSensor1->getValidity();
+        bool egtL2Failed = !egtSensor2->getValidity();
+
+        // 检查N1传感器故障
+        if (n1L1Failed && !n1L2Failed) {
             addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
         }
-
-        if (speedSensor1->getValidity() && !speedSensor2->getValidity()) {
+        if (!n1L1Failed && n1L2Failed) {
+            addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
+        }
+        if (n1L1Failed && n1L2Failed) {
             addWarning("Engine N1 Sensor Failure", CAUTION, currentTime);
         }
 
-        if (!egtSensor1->getValidity() && egtSensor2->getValidity()) {
+        // 检查EGT传感器故障
+        if (egtL1Failed && !egtL2Failed) {
             addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
         }
-
-        if (egtSensor1->getValidity() && !egtSensor2->getValidity()) {
+        if (!egtL1Failed && egtL2Failed) {
+            addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
+        }
+        if (egtL1Failed && egtL2Failed) {
             addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
         }
 
-        // 双传感器故障
-        if ((!speedSensor1->getValidity() && !speedSensor2->getValidity()) ||
-            (!egtSensor1->getValidity() && !egtSensor2->getValidity())) {
+        // 双发动机传感器故障检查
+        if ((n1L1Failed && n1L2Failed) && (egtL1Failed && egtL2Failed)) {
             addWarning("Dual Engine Sensor Failure - Shutdown", WARNING, currentTime);
             stop();
         }
@@ -497,7 +507,7 @@ public:
         return static_cast<double>(GetTickCount64()) / 1000.0;
     }
 
-    // 获取燃油传感器的方法
+    // 获取燃油传感器的���法
     Sensor* getFuelSensor() { return fuelSensor; }
 
     // 析构函数，释放资源
@@ -737,7 +747,7 @@ public:
                         valueColor = RGB(255, 0, 0);      // 红色警告（级别2）
                     }
                     else if (valueToDisplay > 850) {
-                        valueColor = RGB(255, 128, 0);    // 橙色警告（级别1）
+                        valueColor = RGB(255, 128, 0);    // ���色警告（级别1）
                     }
                 }
                 else {
@@ -927,7 +937,7 @@ public:
             WarningDef allWarnings[] = {
                 // 传感器故障
                 {"Single N1 Sensor Failure", NORMAL},           // 单个N1传感器故障
-                {"Engine N1 Sensor Failure", CAUTION},          // 双N1传感器故障
+                {"Engine N1 Sensor Failure", CAUTION},          // ���N1传感器故障
                 {"Single EGT Sensor Failure", NORMAL},          // 单个EGT传感器故障
                 {"Engine EGT Sensor Failure", CAUTION},         // 双EGT传感器故障
                 {"Dual Engine Sensor Failure - Shutdown", WARNING},  // 双传感器故障
