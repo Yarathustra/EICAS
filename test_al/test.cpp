@@ -564,7 +564,7 @@ public:
         static const int DIAL_SPACING_X = 180;   // 表盘水平间距
         static const int DIAL_SPACING_Y = 180;   // 表盘垂直间距
         static const int DIAL_START_X = 100;     // 表盘起始X坐标
-        static const int DIAL_START_Y = 150;     // ���盘起始Y坐标
+        static const int DIAL_START_Y = 150;     // 表盘起始Y坐标
         static const int WARNING_BOX_WIDTH = 380;  // 警告框宽度
         static const int WARNING_BOX_HEIGHT = 30;  // 警告框高度
         static const int WARNING_START_X = 750;    // 警告框起始X坐标
@@ -662,7 +662,7 @@ public:
             cleardevice();
             SetWorkingImage(NULL);
 
-            // 预热图形系统
+            // 预热图��系统
             BeginBatchDraw();
             for (int i = 0; i < 5; i++) {
                 cleardevice();
@@ -814,10 +814,19 @@ public:
             settextstyle(20, 0, _T("Arial"));
             settextcolor(valueColor);
             TCHAR valueText[32];
-            if (isN1Dial) {
+            
+            // 判断是否为N1表盘且对应的传感器无效
+            bool isInvalidN1L1 = _tcscmp(label, _T("N1-L1")) == 0 && !engine->getSpeedSensor1()->getValidity();
+            bool isInvalidN1L2 = _tcscmp(label, _T("N1-L2")) == 0 && !engine->getSpeedSensor2()->getValidity();
+            bool isInvalidN1R1 = _tcscmp(label, _T("N1-R1")) == 0 && !engine->getSpeedSensor1()->getValidity();
+            bool isInvalidN1R2 = _tcscmp(label, _T("N1-R2")) == 0 && !engine->getSpeedSensor2()->getValidity();
+
+
+            if (isN1Dial && (isInvalidN1L1 || isInvalidN1L2 || isInvalidN1R1 || isInvalidN1R2)) {
+                _stprintf_s(valueText, _T("%s: --"), label);
+            } else if (isN1Dial) {
                 _stprintf_s(valueText, _T("%s: %.1f%%"), label, valueToDisplay);
-            }
-            else {
+            } else {
                 _stprintf_s(valueText, _T("%s: %.1f"), label, value);
             }
             outtextxy(x - 40, y + radius + 10, valueText);
@@ -934,7 +943,7 @@ public:
             int y = WARNING_START_Y;
             const vector<WarningMessage>& warnings = engine->getWarnings();
 
-            // 定义所有可能的警告
+            // 定义所有可能的警��
             struct WarningDef {
                 string message;
                 WarningLevel level;
@@ -1053,13 +1062,10 @@ public:
 
         void drawFuelAmount() {
             double fuelAmount = engine->getFuelAmount();
-            bool isFuelSensorValid = engine->getFuelSensor()->getValidity();
 
             // 设置油量显示的颜色
             COLORREF textColor;
-            if (!isFuelSensorValid) {
-                textColor = RGB(0, 255, 0);  // 传感器失效时显示绿色
-            } else if (fuelAmount <= 0) {
+            if (fuelAmount <= 0) {
                 textColor = RGB(255, 0, 0);  // 红色
             } else if (fuelAmount < 1000) {
                 textColor = RGB(255, 191, 0);  // 琥珀色
@@ -1073,11 +1079,7 @@ public:
 
             // 格式化显示文本
             TCHAR amountText[64];
-            if (!isFuelSensorValid) {
-                _stprintf_s(amountText, _T("Fuel Amount: -- L"));
-            } else {
-                _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
-            }
+            _stprintf_s(amountText, _T("Fuel Amount: %.1f L"), fuelAmount);
 
             // 设置显示位置
             int x = 350;
