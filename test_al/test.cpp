@@ -821,8 +821,15 @@ public:
             bool isInvalidN1R1 = _tcscmp(label, _T("N1-R1")) == 0 && !engine->getSpeedSensor1()->getValidity();
             bool isInvalidN1R2 = _tcscmp(label, _T("N1-R2")) == 0 && !engine->getSpeedSensor2()->getValidity();
 
+            // 判断是否为EGT表盘且对应的传感器无效
+            bool isInvalidEGT1 = _tcscmp(label, _T("EGT-L1")) == 0 && !engine->getEgtSensor1()->getValidity();
+            bool isInvalidEGT2 = _tcscmp(label, _T("EGT-L2")) == 0 && !engine->getEgtSensor2()->getValidity();
+            bool isInvalidEGT3 = _tcscmp(label, _T("EGT-R1")) == 0 && !engine->getEgtSensor1()->getValidity();
+            bool isInvalidEGT4 = _tcscmp(label, _T("EGT-R2")) == 0 && !engine->getEgtSensor2()->getValidity();
 
             if (isN1Dial && (isInvalidN1L1 || isInvalidN1L2 || isInvalidN1R1 || isInvalidN1R2)) {
+                _stprintf_s(valueText, _T("%s: --"), label);
+            } else if (isEGTDial && (isInvalidEGT1 || isInvalidEGT2 || isInvalidEGT3 || isInvalidEGT4)) {
                 _stprintf_s(valueText, _T("%s: --"), label);
             } else if (isN1Dial) {
                 _stprintf_s(valueText, _T("%s: %.1f%%"), label, valueToDisplay);
