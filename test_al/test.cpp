@@ -1,4 +1,4 @@
-// test.cpp
+// test.cpp,请谨慎改动GUI类和Engine类
 #include <iostream>
 #include <windows.h>
 #include <graphics.h>
@@ -8,50 +8,48 @@
 #include <ctime>
 #include <string>
 #include <vector>
-#include <iomanip>  // 为setprecision锟斤拷fixed锟斤拷锟斤拷头锟侥硷拷
+#include <iomanip>  
 #include <map>
-#include "DataLogger.h"  // 娣诲姞澶存枃浠跺寘鍚�
-#include "WarningTypes.h"  // 娣诲姞澶存枃浠跺寘鍚�
-#include "Sensor.h"  // 娣诲姞澶存枃浠跺寘鍚�
+#include "DataLogger.h"  
+#include "WarningTypes.h"  
+#include "Sensor.h"  
 using namespace std;
 
 #define PI 3.14159265358979323846
 
-// 募头痈婢�系统囟
 
-
-// 然 Engine 确使 DataLogger
+// 确保 Engine 正确使用 DataLogger
 class Engine {
 private:
     Sensor* speedSensor1;
     Sensor* speedSensor2;
     Sensor* egtSensor1;
     Sensor* egtSensor2;
-    Sensor* fuelSensor;  // 燃痛
+    Sensor* fuelSensor;  // 燃油传感器
     double fuelFlow;
     double fuelAmount;
     bool isRunning;
     bool isStarting;
-    bool isStopping;  // 停状态
-    bool isThrusting;  // 浠�状态
-    double stopStartTime;  // 始停时
-    static const double RATED_SPEED; // ??转
-    static const double T0;  // 始
-    static const double STOP_DURATION;  // 停时洌�10
+    bool isStopping;  // 停止状态
+    bool isThrusting;  // 推力状态
+    double stopStartTime;  // 开始停止时间
+    static const double RATED_SPEED; // 额定转速
+    static const double T0;  // 初始温度
+    static const double STOP_DURATION;  // 停止持续时间，10秒
 
-    // 械某
-    double N1;        // 转
-    double temperature; // 露
-    double prevFuelAmount; // 一时燃
-    double timeStep;      // 时洳�
+    // 机械参数
+    double N1;        // 转速
+    double temperature; // 温度
+    double prevFuelAmount; // 上一次燃油量
+    double timeStep;      // 时间步长
     vector<WarningMessage> warnings;
     double lastWarningTime;
-    double accumulatedTime;  // 刍时
-    const double THRUST_FUEL_STEP = 1.0;  // 每浠�燃
-    const double THRUST_PARAM_MIN_CHANGE = 0.03;  // 小浠� 3%
-    const double THRUST_PARAM_MAX_CHANGE = 0.05;  // 浠� 5%
-    DataLogger* logger;  // 志录指
-    map<string, double> lastLogTimes;  // 每志录时
+    double accumulatedTime;  // 累积时间
+    const double THRUST_FUEL_STEP = 1.0;  // 每次推力增加的燃油量
+    const double THRUST_PARAM_MIN_CHANGE = 0.03;  // 最小推力变化 3%
+    const double THRUST_PARAM_MAX_CHANGE = 0.05;  // 最大推力变化 5%
+    DataLogger* logger;  // 日志记录器指针
+    map<string, double> lastLogTimes;  // 每次日志记录时间
     map<string, double> lastWarningTimes;  // 添加警告记录时间映射
 
     void addWarning(const string& message, WarningLevel level, double currentTime) {
@@ -75,7 +73,6 @@ private:
             logger->logWarning(currentTime, message);
         }
     }
-
 public:
     // Engine
     Sensor* getSpeedSensor2() { return speedSensor2; }
@@ -91,9 +88,9 @@ public:
     void stop() {
         isRunning = false;
         isStarting = false;
-        isStopping = true;  // 停
-        stopStartTime = accumulatedTime;  // 录停始时
-        fuelFlow = 0;  // 燃直
+        isStopping = true;  // 停止状态
+        stopStartTime = accumulatedTime;  // 记录停止开始时间
+        fuelFlow = 0;  // 燃油流量归零
     }
 
     void updateFuelFlow() {
@@ -101,7 +98,7 @@ public:
             fuelAmount -= fuelFlow * timeStep;
             if (fuelAmount < 0) fuelAmount = 0;
 
-            // 燃
+            // 更新燃油传感器的值
             fuelSensor->setValue(fuelAmount);
         }
     }
@@ -110,27 +107,27 @@ public:
         speedSensor2 = new Sensor();
         egtSensor1 = new Sensor();
         egtSensor2 = new Sensor();
-        fuelSensor = new Sensor();  // 始燃
+        fuelSensor = new Sensor();  // 初始化燃油传感器
         fuelFlow = 0;
         fuelAmount = 20000;
         isRunning = false;
         isStarting = false;
         lastWarningTime = 0;
 
-        // 始
+        // 初始化机械参数
         N1 = 0;
-        temperature = T0;  // T0
+        temperature = T0;  // 初始温度
         prevFuelAmount = fuelAmount;
         timeStep = 0.005;  // 5ms
-        accumulatedTime = 0.0;  // 始刍时
+        accumulatedTime = 0.0;  // 初始化累计时间
         isStopping = false;
         stopStartTime = 0;
-        isThrusting = false;  // 始
+        isThrusting = false;  // 初始化推力状态
 
-        // 始EGT
+        // 初始化EGT传感器
         egtSensor1->setValue(T0);
         egtSensor2->setValue(T0);
-        logger = new DataLogger();  // 志录
+        logger = new DataLogger();  // 初始化日志记录器
         lastWarningTimes.clear();  // 确保警告时间映射为空
     }
 
@@ -138,21 +135,21 @@ public:
 
     void updateStartPhase(double timeStep) {
         isThrusting = false;
-        // 刍时
+        // 累计时间
         accumulatedTime += timeStep;
 
-        // 
+        // 输出时间步长和累计时间
         std::cout << "Time step: " << timeStep << ", Accumulated time: " << accumulatedTime << std::endl;
 
         if (accumulatedTime <= 2.0) {
-            // 1
+            // 第一阶段
             double speed = 10000.0 * accumulatedTime;
             N1 = (speed / RATED_SPEED) * 100.0;
 
             speedSensor1->setValue(speed);
             speedSensor2->setValue(speed);
             fuelFlow = 5.0 * accumulatedTime;
-            temperature = T0;  // 2露
+            temperature = T0;  // 初始温度
 
             egtSensor1->setValue(temperature);
             egtSensor2->setValue(temperature);
@@ -160,8 +157,8 @@ public:
             isStarting = true;
         }
         else {
-            // 2
-            double t = accumulatedTime - 2.0;  // t0始时
+            // 第二阶段
+            double t = accumulatedTime - 2.0;  // t0开始时间
             double speed = 20000.0 + 23000.0 * log10(1.0 + t);
             N1 = (speed / RATED_SPEED) * 100.0;
 
@@ -169,7 +166,7 @@ public:
             speedSensor2->setValue(speed);
             fuelFlow = 10.0 + 42.0 * log10(1.0 + t);
 
-            // 愎� T = 900*lg(t-1) + T0
+            // 计算温度 T = 900*lg(t-1) + T0
             temperature = 900.0 * log10(t + 1.0) + T0;
 
             double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
@@ -182,7 +179,7 @@ public:
             egtSensor1->setValue(temperature);
             egtSensor2->setValue(temperature);
 
-            // N195%转
+            // N1达到95%转速
             if (N1 >= 95.0) {
                 isStarting = false;
                 isRunning = true;
@@ -194,10 +191,10 @@ public:
     }
 
     void start() {
-        isRunning = false;  // 锟絝alse
+        isRunning = false;  // 设置为false
         isStarting = true;
-        isStopping = false;  // 停
-        accumulatedTime = 0.0;  // 刍时
+        isStopping = false;  // 停止状态为false
+        accumulatedTime = 0.0;  // 重置累计时间
     }
 
     void update(double timeStep) {
@@ -207,7 +204,7 @@ public:
             updateStartPhase(timeStep);
         }
         else if (isRunning) {
-            // 燃
+            // 燃油流量更新
             if (isThrusting) {
                 updateNewRunningPhase(timeStep);
             }
@@ -221,44 +218,44 @@ public:
     }
 
     void updateRunningPhase(double timeStep) {
-        // 锟斤拷锟叫阶段Ｚ�%
-        double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;  // 0.971.03
+        // 正常运行阶段，N1保持在95%
+        double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;  // 0.97到1.03之间的随机因子
 
-        // 转
-        double baseSpeed = RATED_SPEED * 0.95;  // 95%
+        // 转速
+        double baseSpeed = RATED_SPEED * 0.95;  // 95%的额定转速
         double speed = baseSpeed * randFactor;
         N1 = (speed / RATED_SPEED) * 100.0;
 
-        // 
+        // 更新传感器值
         speedSensor1->setValue(speed);
         speedSensor2->setValue(speed);
 
-        // 露 - 
-        double targetTemp = 850.0;  // 态
+        // 温度 - 目标温度为850度
+        double targetTemp = 850.0;  // 目标温度
         double tempDiff = targetTemp - temperature;
-        double tempAdjustRate = 0.1;  // 
+        double tempAdjustRate = 0.1;  // 温度调整速率
 
-        // 
+        // 更新温度
         temperature += tempDiff * tempAdjustRate;
-        // 
+        // 随机因子调整温度
         temperature *= randFactor;
 
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // 燃
+        // 燃油流量
         if (fuelFlow > 0) {
-            fuelFlow = 40.0 * randFactor;  // 40
+            fuelFlow = 40.0 * randFactor;  // 40的基础燃油流量
             updateFuelFlow();
         }
     }
 
     void updateNewRunningPhase(double timeStep) {
 
-        // 1%~3%
+        // 推力状态下，N1变化在1%到3%之间
         double randFactor = 1.0 + (rand() % 4 - 2) / 100.0;
 
-        // 
+        // 更新转速
         double speed = (N1 / 100.0) * RATED_SPEED * randFactor;
         speedSensor1->setValue(speed);
         speedSensor2->setValue(speed);
@@ -266,12 +263,12 @@ public:
         egtSensor1->setValue(temperature * randFactor);
         egtSensor2->setValue(temperature * randFactor);
 
-        // 燃
+        // 燃油流量
         if (fuelFlow > 0) {
             updateFuelFlow();
         }
 
-        // 
+        // 输出当前状态
         std::cout << "New Running Phase - N1: " << N1
             << "%, Temp: " << temperature
             << ", Fuel Flow: " << fuelFlow
@@ -283,24 +280,24 @@ public:
         double elapsedStopTime = accumulatedTime - stopStartTime;
 
         if (elapsedStopTime >= STOP_DURATION) {
-            // 停
+            // 停止完成
             isStopping = false;
             N1 = 0;
-            temperature = T0;  // 
+            temperature = T0;  // 恢复初始温度
             return;
         }
 
-        // 
-        const double a = 0.9;  // 
+        // 指数衰减
+        const double a = 0.9;  // 衰减系数
 
-        // 
+        // 计算衰减比例
         double decayRatio = pow(a, elapsedStopTime);
 
-        // 转
+        // 更新转速和温度
         N1 = N1 * decayRatio;
         temperature = T0 + (temperature - T0) * decayRatio;
 
-        // 
+        // 随机因子调整显示值
         double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
         double displaySpeed = (N1 / 100.0) * RATED_SPEED * randFactor;
 
@@ -309,14 +306,14 @@ public:
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // 
+        // 输出停止阶段状态
         std::cout << "Stop Phase - Time: " << elapsedStopTime
             << "s, N1: " << N1
             << "%, Temp: " << temperature << std::endl;
     }
 
     void checkWarnings(double currentTime) {
-        // 锟斤拷效
+        // 检查传感器有效性
         if (!speedSensor1->getValidity() && speedSensor2->getValidity()) {
             addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
         }
@@ -333,14 +330,14 @@ public:
             addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
         }
 
-        // 双锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟较硷拷锟�
+        // 双传感器故障
         if ((!speedSensor1->getValidity() && !speedSensor2->getValidity()) ||
             (!egtSensor1->getValidity() && !egtSensor2->getValidity())) {
             addWarning("Dual Engine Sensor Failure - Shutdown", WARNING, currentTime);
             stop();
         }
 
-        // 燃锟斤拷系统锟斤拷锟斤拷锟斤拷锟
+        // 燃油系统警告
         if (fuelAmount < 1000 && isRunning) {
             addWarning("Low Fuel Level", CAUTION, currentTime);
         }
@@ -353,7 +350,7 @@ public:
             addWarning("Fuel Flow Exceeded Limit", CAUTION, currentTime);
         }
 
-        // 转锟劫硷拷锟�
+        // 转速警告
         double n1Percent = getN1();
         if (n1Percent > 120) {
             addWarning("N1 Overspeed Level 2 - Engine Shutdown", WARNING, currentTime);
@@ -363,7 +360,7 @@ public:
             addWarning("N1 Overspeed Level 1", CAUTION, currentTime);
         }
 
-        // 锟铰度硷拷锟�
+        // 温度警告
         if (isStarting) {
             if (temperature > 1000) {
                 addWarning("EGT Overtemp Level 2 During Start - Shutdown", WARNING, currentTime);
@@ -391,42 +388,41 @@ public:
     void increaseThrust() {
         if (!isRunning || isStarting || isStopping) {
             cout << "Not in running state" << endl;
-            return;  // �������锟斤拷锟饺讹拷锟斤拷锟斤拷状态锟��拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+            return;  // 只在运行状态下增加推力
         }
         isThrusting = true;
 
-        // 锟斤拷锟斤拷燃锟斤拷锟斤拷锟斤拷
+        // 增加燃油流量
         fuelFlow += THRUST_FUEL_STEP;
 
-        // 锟斤拷锟斤拷3%~5%之锟斤拷锟斤拷锟斤拷锟戒化锟斤拷
+        // 随机增加3%~5%之间的推力
         double changeRatio = THRUST_PARAM_MIN_CHANGE +
             (static_cast<double>(rand()) / RAND_MAX) *
             (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
 
-        // 锟斤拷锟斤拷转锟劫猴拷锟铰讹拷
-        double baseSpeed = RATED_SPEED * N1 / 100.0;  // 锟斤拷准转锟斤拷
+        // 更新转速
+        double baseSpeed = RATED_SPEED * N1 / 100.0;  // 基准转速
         double newSpeed = baseSpeed * (1.0 + changeRatio);
         N1 = (newSpeed / RATED_SPEED) * 100.0;
 
-
-        // 锟斤拷锟斤拷N1锟斤拷锟斤拷锟斤拷锟斤拷100%
+        // 限制N1最大值为125%
         if (N1 > 125.0) {
             N1 = 125.0;
             newSpeed = RATED_SPEED;
         }
 
-        // 锟斤拷锟铰达拷锟斤拷锟斤拷锟斤拷示值
+        // 更新传感器显示值
         speedSensor1->setValue(newSpeed);
         speedSensor2->setValue(newSpeed);
 
-        // 锟斤拷锟斤拷锟铰讹拷
+        // 更新温度
         temperature = temperature * (1.0 + changeRatio);
 
-        // 锟斤拷锟斤拷EGT锟斤拷锟斤拷锟斤拷
+        // 更新EGT传感器值
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // ���斤拷���斤拷锟斤拷锟�
+        // 输出当前状态
         std::cout << "Thrust increased - N1: " << N1
             << "%, Temp: " << temperature
             << ", Fuel Flow: " << fuelFlow << std::endl;
@@ -434,66 +430,66 @@ public:
 
     void decreaseThrust() {
         if (!isRunning || isStarting || isStopping) {
-            return;  // 只锟斤拷锟饺讹拷锟斤拷锟斤拷状态锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+            return;  // 只在运行状态下减少推力
         }
         isThrusting = true;
 
-        // 确锟斤拷燃锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟叫≈
+        // 确保燃油流量不会低于最小值
         if (fuelFlow > THRUST_FUEL_STEP) {
             fuelFlow -= THRUST_FUEL_STEP;
         }
 
-        // 锟斤拷锟斤拷3%~5%之锟斤拷锟斤拷锟斤化锟斤拷
+        // 随机减少3%~5%之间的推力
         double changeRatio = THRUST_PARAM_MIN_CHANGE +
             (static_cast<double>(rand()) / RAND_MAX) *
             (THRUST_PARAM_MAX_CHANGE - THRUST_PARAM_MIN_CHANGE);
 
-        // 锟斤拷锟斤拷转锟劫猴拷锟铰讹拷
-        double baseSpeed = RATED_SPEED * N1 / 100.0;  // 锟斤拷准转锟斤拷
+        // 更新转速
+        double baseSpeed = RATED_SPEED * N1 / 100.0;  // 基准转速
         double newSpeed = baseSpeed * (1.0 - changeRatio);
         N1 = (newSpeed / RATED_SPEED) * 100.0;
 
-        // 锟斤拷锟斤拷N1锟斤拷锟斤拷锟斤拷锟斤拷小值锟斤拷锟斤拷锟斤拷60%锟斤拷
+        // 限制N1最小值为0%
         if (N1 < 0) {
             N1 = 0;
             newSpeed = 0;
         }
 
-        // 锟斤拷锟铰达拷锟斤拷锟斤拷锟斤拷示值
+        // 更新传感器显示值
         speedSensor1->setValue(newSpeed);
         speedSensor2->setValue(newSpeed);
 
-        // 锟斤拷锟斤拷锟铰度ｏ拷锟斤拷准锟铰讹拷850锟斤拷
+        // 更新温度
         temperature = temperature * (1.0 - changeRatio);
 
-        // 锟斤拷锟斤拷EGT锟斤拷锟斤拷锟斤拷
+        // 更新EGT传感器值
         egtSensor1->setValue(temperature);
         egtSensor2->setValue(temperature);
 
-        // 锟斤拷锟斤拷锟
+        // 输出当前状态
         std::cout << "Thrust decreased - N1: " << N1
             << "%, Temp: " << temperature
             << ", Fuel Flow: " << fuelFlow << std::endl;
     }
 
-    // 锟斤拷锟接达拷锟斤拷锟斤拷锟斤拷锟斤拷模锟解方锟斤拷
+    // 模拟传感器故障的方法
     void simulateSensorFailure(int sensorType) {
         switch (sensorType) {
-        case 0: // 锟斤拷锟斤拷转锟劫达拷锟斤拷锟斤拷锟斤拷锟斤拷
+        case 0: // 单个N1传感器故障
             speedSensor1->setValidity(false);
             break;
-        case 1: // 锟斤拷锟斤拷转锟劫达拷锟斤拷锟斤拷锟斤拷锟斤拷
+        case 1: // 双N1传感器故障
             speedSensor1->setValidity(false);
             speedSensor2->setValidity(false);
             break;
-        case 2: // 锟斤拷锟斤拷EGT锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+        case 2: // 单个EGT传感器故障
             egtSensor1->setValidity(false);
             break;
-        case 3: // 锟��拷锟斤拷EGT锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
+        case 3: // 双EGT传感器故障
             egtSensor1->setValidity(false);
             egtSensor2->setValidity(false);
             break;
-            // ... 锟斤拷锟斤拷锟斤拷锟斤拷
+            // ... 其他故障类型
         }
     }
 
@@ -501,18 +497,18 @@ public:
         return static_cast<double>(GetTickCount64()) / 1000.0;
     }
 
-    // 锟斤拷锟斤拷燃锟酵达拷锟斤拷锟斤拷锟斤拷锟侥凤拷锟绞凤拷锟斤拷
+    // 获取燃油传感器的方法
     Sensor* getFuelSensor() { return fuelSensor; }
 
-    // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷删锟斤拷燃锟酵达拷锟斤拷锟斤拷
+    // 析构函数，释放资源
     ~Engine() {
         delete speedSensor1;
         delete speedSensor2;
         delete egtSensor1;
         delete egtSensor2;
-        delete fuelSensor;  // 删锟斤拷燃锟酵达拷锟斤拷锟斤拷
+        delete fuelSensor;  // 删除燃油传感器
         if (logger) {
-            delete logger;  // 锟斤拷全删锟斤拷锟斤拷志锟斤拷录锟斤拷
+            delete logger;  // 安全删除日志记录器
             logger = nullptr;
         }
         lastWarningTimes.clear();
@@ -523,7 +519,7 @@ public:
     void setFuelFlow(double flow) { fuelFlow = flow; }
     void setN1(double value) { N1 = value; }
     void setTemperature(double temp) { temperature = temp; }
-    
+
     void resetSensors() {
         speedSensor1->setValidity(true);
         speedSensor2->setValidity(true);
@@ -537,720 +533,720 @@ public:
         warnings.clear();
         lastWarningTimes.clear();
     }
-};
-
-const double Engine::RATED_SPEED = 40000.0;
-const double Engine::T0 = 20.0;
-const double Engine::STOP_DURATION = 10.0;  // 10锟斤拷停锟斤拷时锟斤拷
-
-// GUI锟斤拷
-class GUI {
-private:
-    static const int WINDOW_WIDTH = 1600;    // 锟斤拷锟接达拷锟节匡拷锟斤拷
-    static const int WINDOW_HEIGHT = 900;    // 锟斤拷锟接达拷锟节高讹拷
-    static const int DIAL_RADIUS = 60;       // 锟斤拷锟斤拷锟斤拷锟教达拷小
-    static const int DIAL_SPACING_X = 180;   // 锟斤拷锟斤拷锟斤拷锟斤拷水平锟斤拷
-    static const int DIAL_SPACING_Y = 180;   // 锟斤拷锟斤拷锟斤拷锟斤拷啵锟斤拷140锟斤拷为180
-    static const int DIAL_START_X = 100;     // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷始位锟斤拷
-    static const int DIAL_START_Y = 150;
-    static const int WARNING_BOX_WIDTH = 380;  // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-    static const int WARNING_BOX_HEIGHT = 30;
-    static const int WARNING_START_X = 750;
-    static const int WARNING_START_Y = 100;
-    static const int WARNING_SPACING = 5;
-    static const int REFRESH_RATE = 200;  // 200Hz = 5ms刷锟斤拷一锟斤拷
-    static const int FRAME_TIME = 1000 / REFRESH_RATE;  // 5ms
-    ULONGLONG lastFrameTime;
-    IMAGE* backBuffer;
-    Engine* engine;  // 确锟斤拷 engine 指锟诫被锟斤拷确锟斤拷锟斤拷
-
-public:
-    struct Button {
-        int x, y, width, height;
-        const TCHAR* text;
-        bool pressed;
-        COLORREF bgColor;
-        COLORREF textColor;
     };
 
-    Button startButton;
-    Button stopButton;
-    Button increaseThrust;
-    Button decreaseThrust;
+    const double Engine::RATED_SPEED = 40000.0;
+    const double Engine::T0 = 20.0;
+    const double Engine::STOP_DURATION = 10.0;  // 10秒停止时间
 
-    // 添加测试警告按钮
-    Button warningButtons[14];
+    // GUI类
+    class GUI {
+    private:
+        static const int WINDOW_WIDTH = 1600;    // 窗口宽度
+        static const int WINDOW_HEIGHT = 900;    // 窗口高度
+        static const int DIAL_RADIUS = 60;       // 表盘半径
+        static const int DIAL_SPACING_X = 180;   // 表盘水平间距
+        static const int DIAL_SPACING_Y = 180;   // 表盘垂直间距
+        static const int DIAL_START_X = 100;     // 表盘起始X坐标
+        static const int DIAL_START_Y = 150;     // 表盘起始Y坐标
+        static const int WARNING_BOX_WIDTH = 380;  // 警告框宽度
+        static const int WARNING_BOX_HEIGHT = 30;  // 警告框高度
+        static const int WARNING_START_X = 750;    // 警告框起始X坐标
+        static const int WARNING_START_Y = 100;    // 警告框起始Y坐标
+        static const int WARNING_SPACING = 5;      // 警告框间距
+        static const int REFRESH_RATE = 200;       // 刷新率200Hz = 5ms
+        static const int FRAME_TIME = 1000 / REFRESH_RATE;  // 5ms
+        ULONGLONG lastFrameTime;
+        IMAGE* backBuffer;
+        Engine* engine;
+        // 确保 engine 指针有效
 
-    GUI(int w, int h, Engine* eng) : engine(eng) {
-        // 确锟斤拷 engine 指锟斤拷锟斤拷效
-        if (!eng) {
-            throw std::runtime_error("Invalid engine pointer");
-        }
-
-        // 锟斤拷锟饺��拷始锟斤拷钮锟斤拷锟斤拷锟斤拷预锟斤拷时锟斤拷锟斤拷使锟斤拷
-        startButton = { 50, 500, 120, 40, _T("START"), false, RGB(0, 150, 0), WHITE };
-        stopButton = { 200, 500, 120, 40, _T("STOP"), false, RGB(150, 0, 0), WHITE };
-        increaseThrust = { 350, 500, 120, 40, _T("THRUST+"), false, RGB(0, 100, 150), WHITE };
-        decreaseThrust = { 500, 500, 120, 40, _T("THRUST-"), false, RGB(0, 100, 150), WHITE };
-
-        // 初始化警告测试按钮
-        const TCHAR* warningLabels[] = {
-            _T("Single N1"),      // 单个N1传感器故障
-            _T("Dual N1"),        // 双N1传感器故障
-            _T("Single EGT"),     // 单个EGT传感器故障
-            _T("Dual EGT"),       // 双EGT传感器故障
-            _T("Low Fuel"),       // 燃油量低
-            _T("Fuel Sensor"),    // 燃油传感器故障
-            _T("High Flow"),      // 燃油流量超限
-            _T("N1 Over L1"),     // N1超速一级
-            _T("N1 Over L2"),     // N1超速二级
-            _T("EGT Start L1"),   // 启动时EGT超温一级
-            _T("EGT Start L2"),   // 启动时EGT超温二级
-            _T("EGT Run L1"),     // 运行时EGT超温一级
-            _T("EGT Run L2"),     // 运行时EGT超温二级
-            _T("Reset Sensors")    // 重置所有传感器
+    public:
+        struct Button {
+            int x, y, width, height;
+            const TCHAR* text;
+            bool pressed;
+            COLORREF bgColor;
+            COLORREF textColor;
         };
 
-        // 设置按钮位置和样式
-        int startX = 50;
-        int startY = 600;
-        int buttonWidth = 100;
-        int buttonHeight = 30;
-        int buttonSpacing = 10;
-        int buttonsPerRow = 7;
+        Button startButton;
+        Button stopButton;
+        Button increaseThrust;
+        Button decreaseThrust;
 
-        for (int i = 0; i < 14; i++) {
-            int row = i / buttonsPerRow;
-            int col = i % buttonsPerRow;
-            warningButtons[i] = {
-                startX + col * (buttonWidth + buttonSpacing),
-                startY + row * (buttonHeight + buttonSpacing),
-                buttonWidth,
-                buttonHeight,
-                warningLabels[i],
-                false,
-                RGB(100, 100, 100),
-                WHITE
+        // 添加测试警告按钮
+        Button warningButtons[14];
+
+        GUI(int w, int h, Engine* eng) : engine(eng) {
+            // 确保 engine 指针有效
+            if (!eng) {
+                throw std::runtime_error("Invalid engine pointer");
+            }
+
+            // 初始化按钮
+            startButton = { 50, 500, 120, 40, _T("START"), false, RGB(0, 150, 0), WHITE };
+            stopButton = { 200, 500, 120, 40, _T("STOP"), false, RGB(150, 0, 0), WHITE };
+            increaseThrust = { 350, 500, 120, 40, _T("THRUST+"), false, RGB(0, 100, 150), WHITE };
+            decreaseThrust = { 500, 500, 120, 40, _T("THRUST-"), false, RGB(0, 100, 150), WHITE };
+
+            // 初始化警告测试按钮
+            const TCHAR* warningLabels[] = {
+                    _T("Single N1"),      // 单个N1传感器故障
+                    _T("Dual N1"),        // 双N1传感器故障
+                    _T("Single EGT"),     // 单个EGT传感器故障
+                    _T("Dual EGT"),       // 双EGT传感器故障
+                    _T("Low Fuel"),       // 燃油量低
+                    _T("Fuel Sensor"),    // 燃油传感器故障
+                    _T("High Flow"),      // 燃油流量超限
+                    _T("N1 Over L1"),     // N1超速一级
+                    _T("N1 Over L2"),     // N1超速二级
+                    _T("EGT Start L1"),   // 启动时EGT超温一级
+                    _T("EGT Start L2"),   // 启动时EGT超温二级
+                    _T("EGT Run L1"),     // 运行时EGT超温一级
+                    _T("EGT Run L2"),     // 运行时EGT超温二级
+                    _T("Reset Sensors")   // 重置所有传感器
             };
-        }
 
-        // 锟斤拷始锟斤拷图锟斤拷系统
-        initgraph(WINDOW_WIDTH, WINDOW_HEIGHT);
-        setbkcolor(RGB(40, 40, 40));
-        cleardevice();
+            // 设置按钮位置和样式
+            int startX = 50;
+            int startY = 600;
+            int buttonWidth = 100;
+            int buttonHeight = 30;
+            int buttonSpacing = 10;
+            int buttonsPerRow = 7;
 
-        // 锟斤拷锟斤拷锟襟备伙拷锟斤拷锟斤拷
-        backBuffer = new IMAGE(WINDOW_WIDTH, WINDOW_HEIGHT);
-        if (!backBuffer) {
-            throw std::runtime_error("Failed to create back buffer");
-        }
+            for (int i = 0; i < 14; i++) {
+                int row = i / buttonsPerRow;
+                int col = i % buttonsPerRow;
+                warningButtons[i] = {
+                        startX + col * (buttonWidth + buttonSpacing),
+                        startY + row * (buttonHeight + buttonSpacing),
+                        buttonWidth,
+                        buttonHeight,
+                        warningLabels[i],
+                        false,
+                        RGB(100, 100, 100),
+                        WHITE
+                };
+            }
 
-        SetWorkingImage(backBuffer);
-        cleardevice();
-        SetWorkingImage(NULL);
-
-        // 预锟饺伙拷图系统
-        BeginBatchDraw();
-        for (int i = 0; i < 5; i++) {
+            // 初始化图形系统
+            initgraph(WINDOW_WIDTH, WINDOW_HEIGHT);
+            setbkcolor(RGB(40, 40, 40));
             cleardevice();
+
+            // 创建后备缓冲区
+            backBuffer = new IMAGE(WINDOW_WIDTH, WINDOW_HEIGHT);
+            if (!backBuffer) {
+                throw std::runtime_error("Failed to create back buffer");
+            }
+
+            SetWorkingImage(backBuffer);
+            cleardevice();
+            SetWorkingImage(NULL);
+
+            // 预热图形系统
+            BeginBatchDraw();
+            for (int i = 0; i < 5; i++) {
+                cleardevice();
+                drawDials();
+                drawButton(startButton);
+                drawButton(stopButton);
+                drawButton(increaseThrust);
+                drawButton(decreaseThrust);
+                drawStatus(false, false);
+                drawAllWarningBoxes();
+            }
+            EndBatchDraw();
+
+            lastFrameTime = GetTickCount64();
+        }
+
+        ~GUI() {
+            if (backBuffer) {
+                delete backBuffer;
+                backBuffer = nullptr;
+            }
+        }
+
+        void drawArcDial(int x, int y, int radius, double value, double maxValue,
+            const TCHAR* label, COLORREF color) {
+            // 绘制表盘背景圆圈
+            setcolor(RGB(60, 60, 60));
+            setfillcolor(RGB(20, 20, 20));
+            fillcircle(x, y, radius);
+
+            // 判断是N1表盘还是EGT表盘
+            bool isN1Dial = _tcsstr(label, _T("N1")) != nullptr;
+            bool isEGTDial = _tcsstr(label, _T("EGT")) != nullptr;
+            double valueToDisplay = value;
+            double maxValueToDisplay = maxValue;
+            bool isStarting = engine->getIsStarting();
+            int arcDegrees = 360;  // 默认360度
+
+            if (isN1Dial) {
+                valueToDisplay = (value / 40000.0) * 100;  // 40000为额定转速
+                maxValueToDisplay = 125;  // 最大125%
+                arcDegrees = 210;  // N1表盘使用210度
+            }
+            else if (isEGTDial) {
+                maxValueToDisplay = 1200;  // EGT最大值1200度
+                arcDegrees = 210;   // EGT表盘也使用210度
+            }
+
+            // 刻度
+            int startAngle = 90;  // 起始角度，12点位置
+
+            // 绘制主刻度线
+            for (int i = 0; i <= arcDegrees; i += 30) {
+                double angle = (startAngle - i) * PI / 180;
+                int x1 = x + (radius - 10) * cos(angle);
+                int y1 = y - (radius - 10) * sin(angle);
+                int x2 = x + radius * cos(angle);
+                int y2 = y - radius * sin(angle);
+                setcolor(RGB(100, 100, 100));
+                setlinestyle(PS_SOLID, 2);
+                line(x1, y1, x2, y2);
+            }
+
+            // 绘制次刻度线
+            for (int i = 0; i <= arcDegrees; i += 6) {
+                if (i % 30 != 0) {  // 跳过主刻度线位置
+                    double angle = (startAngle - i) * PI / 180;
+                    int x1 = x + (radius - 5) * cos(angle);
+                    int y1 = y - (radius - 5) * sin(angle);
+                    int x2 = x + radius * cos(angle);
+                    int y2 = y - radius * sin(angle);
+                    setcolor(RGB(60, 60, 60));
+                    setlinestyle(PS_SOLID, 1);
+                    line(x1, y1, x2, y2);
+                }
+            }
+
+            // 根据值状态选择颜色
+            COLORREF valueColor = RGB(255, 255, 255);  // 默认白色
+            if (isN1Dial) {
+                if (valueToDisplay > 105) valueColor = RGB(255, 128, 0);
+                if (valueToDisplay > 120) valueColor = RGB(255, 0, 0);
+            }
+            else if (isEGTDial) {
+                if (isStarting) {
+                    // 启动阶段温度警告
+                    if (valueToDisplay > 1000) {
+                        valueColor = RGB(255, 0, 0);      // 红色警告（级别2）
+                    }
+                    else if (valueToDisplay > 850) {
+                        valueColor = RGB(255, 128, 0);    // 橙色警告（级别1）
+                    }
+                }
+                else {
+                    // 运行阶段温度警告
+                    if (valueToDisplay > 1100) {
+                        valueColor = RGB(255, 0, 0);      // 红色警告（级别4）
+                    }
+                    else if (valueToDisplay > 950) {
+                        valueColor = RGB(255, 128, 0);    // 橙色警告（级别3）
+                    }
+                }
+            }
+
+            // 绘制值的弧线
+            double angleRatio = isN1Dial ? (valueToDisplay / maxValueToDisplay) : (valueToDisplay / maxValue);
+            angleRatio = min(angleRatio, 1.0);
+            double angle = angleRatio * arcDegrees;
+
+            // 使用颜色填充弧线
+            setfillcolor(valueColor);
+            setcolor(valueColor);
+            POINT* points = new POINT[362];
+            points[0].x = x;
+            points[0].y = y;
+
+            for (int i = 0; i <= angle; i++) {
+                double rad = (90 - i) * PI / 180;
+                points[i + 1].x = x + (radius - 15) * cos(rad);  // 内圈半径减小以留出刻度空间
+                points[i + 1].y = y - (radius - 15) * sin(rad);
+            }
+
+            solidpolygon(points, static_cast<int>(angle) + 2);
+            delete[] points;
+
+            // 绘制指针
+            double pointerAngle = (90 - angle) * PI / 180;
+            int pointerLength = radius - 10;
+            int pointerX = x + pointerLength * cos(pointerAngle);
+            int pointerY = y - pointerLength * sin(pointerAngle);
+
+            // 绘制指针阴影
+            setcolor(RGB(20, 20, 20));
+            setlinestyle(PS_SOLID, 3);
+            line(x, y, pointerX + 2, pointerY + 2);
+
+            // 绘制指针本体
+            setcolor(WHITE);
+            setlinestyle(PS_SOLID, 2);
+            line(x, y, pointerX, pointerY);
+
+            // 绘制指针中心装饰
+            setfillcolor(RGB(40, 40, 40));
+            fillcircle(x, y, 8);
+            setfillcolor(valueColor);
+            fillcircle(x, y, 4);
+
+            // 绘制标签和值
+            settextstyle(20, 0, _T("Arial"));
+            settextcolor(valueColor);
+            TCHAR valueText[32];
+            if (isN1Dial) {
+                _stprintf_s(valueText, _T("%s: %.1f%%"), label, valueToDisplay);
+            }
+            else {
+                _stprintf_s(valueText, _T("%s: %.1f"), label, value);
+            }
+            outtextxy(x - 40, y + radius + 10, valueText);
+        }
+
+        void drawDials() {
+            // 第一行 - 左侧传感器显示
+            drawArcDial(DIAL_START_X, DIAL_START_Y, DIAL_RADIUS,
+                engine->getSpeedSensor1()->getValue(), 40000, _T("N1-L1"), RGB(0, 255, 0));
+            drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y, DIAL_RADIUS,
+                engine->getSpeedSensor2()->getValue(), 40000, _T("N1-L2"), RGB(0, 255, 0));
+            drawArcDial(DIAL_START_X + DIAL_SPACING_X * 2, DIAL_START_Y, DIAL_RADIUS,
+                engine->getEgtSensor1()->getValue(), 1200, _T("EGT-L1"), RGB(255, 128, 0));
+            drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y, DIAL_RADIUS,
+                engine->getEgtSensor2()->getValue(), 1200, _T("EGT-L2"), RGB(255, 128, 0));
+
+            // 第二行 - 右侧传感器显示 (假设右侧传感器与左侧相同)
+            drawArcDial(DIAL_START_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
+                engine->getSpeedSensor1()->getValue(), 40000, _T("N1-R1"), RGB(0, 255, 0));
+            drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
+                engine->getSpeedSensor2()->getValue(), 40000, _T("N1-R2"), RGB(0, 255, 0));
+            drawArcDial(DIAL_START_X + DIAL_SPACING_X * 2, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
+                engine->getEgtSensor1()->getValue(), 1200, _T("EGT-R1"), RGB(255, 128, 0));
+            drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
+                engine->getEgtSensor2()->getValue(), 1200, _T("EGT-R2"), RGB(255, 128, 0));
+        }
+
+        void drawButton(const Button& btn) {
+            // 绘制按钮背景
+            setfillcolor(btn.pressed ? RGB(150, 150, 150) : btn.bgColor);
+            solidroundrect(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, 10, 10);
+
+            // 绘制按钮文本
+            settextstyle(20, 0, _T("Arial"));
+            setbkmode(TRANSPARENT);
+            settextcolor(btn.textColor);
+
+            // 计算文本位置使其居中
+            int textWidth = textwidth(btn.text);
+            int textHeight = textheight(btn.text);
+            int textX = btn.x + (btn.width - textWidth) / 2;
+            int textY = btn.y + (btn.height - textHeight) / 2;
+
+            outtextxy(textX, textY, btn.text);
+        }
+
+        void drawStatus(bool isStarting, bool isRunning) {
+            settextstyle(24, 0, _T("Arial"));
+            settextcolor(WHITE);
+            if (!isStarting) {
+                setfillcolor(RGB(0, 200, 0));
+                solidroundrect(50, 20, 150, 50, 10, 10);
+                settextcolor(BLACK);
+                outtextxy(60, 25, _T("   start"));
+            }
+
+            if (!isRunning) {
+                setfillcolor(RGB(0, 200, 0));
+                solidroundrect(170, 20, 270, 50, 10, 10);
+                settextcolor(BLACK);
+                outtextxy(185, 25, _T("   run"));
+            }
+            if (isStarting) {
+                setfillcolor(RGB(0, 255, 0));
+                solidroundrect(50, 20, 150, 50, 10, 10);
+                settextcolor(BLACK);
+                outtextxy(60, 25, _T("   start"));
+            }
+
+            if (isRunning) {
+                setfillcolor(RGB(0, 255, 0));
+                solidroundrect(170, 20, 270, 50, 10, 10);
+                settextcolor(BLACK);
+                outtextxy(185, 25, _T("   run"));
+            }
+        }
+
+        void drawWarningBox(const string& message, WarningLevel level, bool isActive, int x, int y) {
+            COLORREF boxColor;
+            switch (level) {
+            case NORMAL: boxColor = WHITE; break;
+            case CAUTION: boxColor = RGB(255, 128, 0); break;  // 橙色
+            case WARNING: boxColor = RGB(255, 0, 0); break;    // 红色
+            default: boxColor = RGB(128, 128, 128);            // 灰色
+            }
+
+            // 绘制警告框背景
+            setfillcolor(RGB(30, 30, 30));
+            solidrectangle(x - 2, y - 2, x + WARNING_BOX_WIDTH + 2, y + WARNING_BOX_HEIGHT + 2);
+
+            // 绘制警告框
+            setfillcolor(isActive ? RGB(60, 60, 60) : RGB(40, 40, 40));
+            solidrectangle(x, y, x + WARNING_BOX_WIDTH, y + WARNING_BOX_HEIGHT);
+
+            // 绘制警告框边框
+            setcolor(isActive ? boxColor : RGB(80, 80, 80));
+            rectangle(x - 1, y - 1, x + WARNING_BOX_WIDTH + 1, y + WARNING_BOX_HEIGHT + 1);
+
+            // 绘制警告框文本
+            settextstyle(16, 0, _T("Arial"));
+            settextcolor(isActive ? boxColor : RGB(128, 128, 128));
+            wstring wstr(message.begin(), message.end());
+            outtextxy(x + 10, y + 5, wstr.c_str());
+
+            // 绘制警告框左侧指示条
+            if (isActive) {
+                setfillcolor(boxColor);
+                solidrectangle(x, y, x + 3, y + WARNING_BOX_HEIGHT);
+            }
+        }
+
+        void drawAllWarningBoxes() {
+            int x = WARNING_START_X;
+            int y = WARNING_START_Y;
+            const vector<WarningMessage>& warnings = engine->getWarnings();
+
+            // 定义所有可能的警告
+            struct WarningDef {
+                string message;
+                WarningLevel level;
+            };
+
+            WarningDef allWarnings[] = {
+                // 传感器故障
+                {"Single N1 Sensor Failure", NORMAL},           // 单个N1传感器故障
+                {"Engine N1 Sensor Failure", CAUTION},          // 双N1传感器故障
+                {"Single EGT Sensor Failure", NORMAL},          // 单个EGT传感器故障
+                {"Engine EGT Sensor Failure", CAUTION},         // 双EGT传感器故障
+                {"Dual Engine Sensor Failure - Shutdown", WARNING},  // 双传感器故障
+
+                // 燃油系统警告
+                {"Low Fuel Level", CAUTION},                    // 燃油量低
+                {"Fuel Sensor Failure", WARNING},               // 燃油传感器故障
+                {"Fuel Flow Exceeded Limit", CAUTION},          // 燃油流量超限
+
+                // 转速警告
+                {"N1 Overspeed Level 1", CAUTION},             // N1超速一级
+                {"N1 Overspeed Level 2 - Engine Shutdown", WARNING}, // N1超速二级
+
+                // 温度警告
+                {"EGT Overtemp Level 1 During Start", CAUTION},      // 启动时EGT超温一级
+                {"EGT Overtemp Level 2 During Start - Shutdown", WARNING}, // 启动时EGT超温二级
+                {"EGT Overtemp Level 1 During Run", CAUTION},        // 运行时EGT超温一级
+                {"EGT Overtemp Level 2 During Run - Shutdown", WARNING}    // 运行时EGT超温二级
+            };
+
+            // 绘制所有警告框
+            for (const auto& warningDef : allWarnings) {
+                bool isActive = false;
+
+                // 检查当前警告是否激活
+                for (const auto& warning : warnings) {
+                    // 检查警告是否在最近5秒内
+                    if (warning.message == warningDef.message &&
+                        warning.timestamp >= engine->getCurrentTime() - 5.0) {
+                        isActive = true;
+                        break;
+                    }
+                }
+
+                drawWarningBox(warningDef.message, warningDef.level, isActive, x, y);
+                y += WARNING_BOX_HEIGHT + WARNING_SPACING;
+
+                // 每6个警告框换一列
+                if (y > WARNING_START_Y + 6 * (WARNING_BOX_HEIGHT + WARNING_SPACING)) {
+                    x += WARNING_BOX_WIDTH + WARNING_SPACING;
+                    y = WARNING_START_Y;
+                }
+            }
+        }
+
+        void drawFuelFlow() {
+            double fuelFlow = engine->getFuelFlow();
+
+            // 设置燃油流量显示的颜色
+            COLORREF textColor, borderColor, bgColor;
+            if (fuelFlow > 0) {
+                if (fuelFlow > 50) {
+                    // 燃油流量超限 - 橙色警告
+                    textColor = RGB(255, 128, 0);   // 橙色文本
+                    borderColor = RGB(255, 128, 0); // 橙色边框
+                    bgColor = RGB(40, 40, 40);      // 背景色
+                }
+                else {
+                    // 正常燃油流量状态 - 白色
+                    textColor = WHITE;              // 白色文本
+                    borderColor = RGB(100, 100, 100); // 灰色边框
+                    bgColor = RGB(40, 40, 40);       // 背景色
+                }
+            }
+            else {
+                // 燃油流量为零状态 - 灰色
+                textColor = RGB(150, 150, 150);   // 灰色文本
+                borderColor = RGB(100, 100, 100); // 灰色边框
+                bgColor = RGB(40, 40, 40);       // 背景色
+            }
+
+            // 设置文本样式
+            settextstyle(24, 0, _T("Arial"));
+            settextcolor(textColor);
+
+            // 格式化显示文本
+            TCHAR flowText[64];
+            _stprintf_s(flowText, _T("Fuel Flow: %.1f kg/h"), fuelFlow);
+
+            // 设置显示位置
+            int x = 50;
+            int y = 560;
+            int width = 200;
+            int height = 30;
+
+            // 绘制背景框
+            setfillcolor(RGB(30, 30, 30));
+            solidrectangle(x - 1, y - 1, x + width + 1, y + height + 1);
+
+            // 绘制背景色
+            setfillcolor(bgColor);
+            solidrectangle(x, y, x + width, y + height);
+
+            // 绘制边框
+            setcolor(borderColor);
+            rectangle(x, y, x + width, y + height);
+
+            // 绘制左侧指示条
+            if (fuelFlow > 0) {
+                setfillcolor(borderColor);
+                solidrectangle(x, y, x + 3, y + height);
+            }
+
+            // 绘制文本，微调位置使其居中
+            outtextxy(x + 10, y + (height - textheight(flowText)) / 2, flowText);
+        }
+
+        void update() {
+            ULONGLONG currentTime = GetTickCount64();
+            ULONGLONG deltaTime = currentTime - lastFrameTime;
+
+            if (deltaTime < FRAME_TIME) {
+                return;
+            }
+
+            SetWorkingImage(backBuffer);
+            cleardevice();
+
             drawDials();
             drawButton(startButton);
             drawButton(stopButton);
             drawButton(increaseThrust);
             drawButton(decreaseThrust);
-            drawStatus(false, false);
+            drawStatus(engine->getIsStarting(), engine->getIsRunning());
             drawAllWarningBoxes();
-        }
-        EndBatchDraw();
+            drawFuelFlow();  // 确保燃油流量显示在所有元素之后
 
-        lastFrameTime = GetTickCount64();
-    }
-
-    ~GUI() {
-        if (backBuffer) {
-            delete backBuffer;
-            backBuffer = nullptr;
-        }
-    }
-
-    void drawArcDial(int x, int y, int radius, double value, double maxValue,
-        const TCHAR* label, COLORREF color) {
-        // 锟��拷锟斤拷锟斤拷锟斤拷锟斤拷圆锟轿碉拷锟���拷
-        setcolor(RGB(60, 60, 60));
-        setfillcolor(RGB(20, 20, 20));
-        fillcircle(x, y, radius);
-
-        // 锟斤拷锟斤拷转锟劫憋拷锟教猴拷EGT锟斤拷锟教碉拷锟斤拷锟解处锟斤拷
-        bool isN1Dial = _tcsstr(label, _T("N1")) != nullptr;
-        bool isEGTDial = _tcsstr(label, _T("EGT")) != nullptr;
-        double valueToDisplay = value;
-        double maxValueToDisplay = maxValue;
-        bool isStarting = engine->getIsStarting();
-        int arcDegrees = 360;  // 默锟斤拷为360锟斤拷
-
-        if (isN1Dial) {
-            valueToDisplay = (value / 40000.0) * 100;  // 40000锟角额定转锟斤拷
-            maxValueToDisplay = 125;  // 锟斤拷锟�125%
-            arcDegrees = 210;  // N1锟斤拷锟斤拷使锟斤拷210锟斤拷
-        }
-        else if (isEGTDial) {
-            maxValueToDisplay = 1200;  // EGT锟斤拷锟街�1200锟斤拷
-            arcDegrees = 210;   // EGT锟斤拷锟斤拷也使锟斤拷210锟饺伙拷锟斤拷
-        }
-
-        // 锟斤拷锟狡刻讹拷
-        int startAngle = 90;  // 锟斤拷始锟角度ｏ拷12锟斤拷锟斤拷位锟矫ｏ拷
-
-        // 锟斤拷锟斤拷锟斤拷锟教讹拷锟���拷
-        for (int i = 0; i <= arcDegrees; i += 30) {
-            double angle = (startAngle - i) * PI / 180;
-            int x1 = x + (radius - 10) * cos(angle);
-            int y1 = y - (radius - 10) * sin(angle);
-            int x2 = x + radius * cos(angle);
-            int y2 = y - radius * sin(angle);
-            setcolor(RGB(100, 100, 100));
-            setlinestyle(PS_SOLID, 2);
-            line(x1, y1, x2, y2);
-        }
-
-        // 锟斤拷锟狡次刻讹拷锟斤拷
-        for (int i = 0; i <= arcDegrees; i += 6) {
-            if (i % 30 != 0) {  // 锟斤拷锟斤拷锟斤拷锟教讹拷位
-                double angle = (startAngle - i) * PI / 180;
-                int x1 = x + (radius - 5) * cos(angle);
-                int y1 = y - (radius - 5) * sin(angle);
-                int x2 = x + radius * cos(angle);
-                int y2 = y - radius * sin(angle);
-                setcolor(RGB(60, 60, 60));
-                setlinestyle(PS_SOLID, 1);
-                line(x1, y1, x2, y2);
-            }
-        }
-
-        // 锟斤拷锟斤拷值锟斤拷状态选锟斤拷锟斤拷色
-        COLORREF valueColor = RGB(255, 255, 255);  // 默锟较帮拷色
-        if (isN1Dial) {
-            if (valueToDisplay > 105) valueColor = RGB(255, 128, 0);
-            if (valueToDisplay > 120) valueColor = RGB(255, 0, 0);
-        }
-        else if (isEGTDial) {
-            if (isStarting) {
-                // 锟斤拷锟斤拷锟斤拷锟斤拷锟叫碉拷锟铰度撅拷锟斤拷
-                if (valueToDisplay > 1000) {
-                    valueColor = RGB(255, 0, 0);      // 锟斤拷色锟斤拷锟芥（锟斤拷锟斤拷2锟斤拷
-                }
-                else if (valueToDisplay > 850) {
-                    valueColor = RGB(255, 128, 0);    // 锟斤拷锟斤拷色锟斤拷锟芥（锟斤拷锟斤拷1锟斤拷
-                }
-            }
-            else {
-                // 锟斤拷态锟斤拷锟斤拷时锟斤拷锟铰度撅拷锟斤拷
-                if (valueToDisplay > 1100) {
-                    valueColor = RGB(255, 0, 0);      // 锟斤拷色锟斤拷锟芥（锟斤拷锟斤拷4锟���拷
-                }
-                else if (valueToDisplay > 950) {
-                    valueColor = RGB(255, 128, 0);    // 锟斤拷锟斤拷色锟斤拷锟芥（锟斤拷锟斤拷3锟斤拷
-                }
-            }
-        }
-
-        // 锟斤拷锟斤拷值锟侥伙拷锟轿憋拷锟斤拷
-        double angleRatio = isN1Dial ? (valueToDisplay / maxValueToDisplay) : (valueToDisplay / maxValue);
-        angleRatio = min(angleRatio, 1.0);
-        double angle = angleRatio * arcDegrees;
-
-        // 使������斤拷锟斤拷色锟斤拷锟狡伙拷锟斤拷
-        setfillcolor(valueColor);
-        setcolor(valueColor);
-        POINT* points = new POINT[362];
-        points[0].x = x;
-        points[0].y = y;
-
-        for (int i = 0; i <= angle; i++) {
-            double rad = (90 - i) * PI / 180;
-            points[i + 1].x = x + (radius - 15) * cos(rad);  // 锟斤拷小锟斤拷锟诫径锟斤拷锟斤拷锟斤拷锟教度空硷拷
-            points[i + 1].y = y - (radius - 15) * sin(rad);
-        }
-
-        solidpolygon(points, static_cast<int>(angle) + 2);
-        delete[] points;
-
-        // 锟斤拷锟斤拷指锟斤拷
-        double pointerAngle = (90 - angle) * PI / 180;
-        int pointerLength = radius - 10;
-        int pointerX = x + pointerLength * cos(pointerAngle);
-        int pointerY = y - pointerLength * sin(pointerAngle);
-
-        // 锟斤拷锟斤拷指锟斤拷锟斤拷影
-        setcolor(RGB(20, 20, 20));
-        setlinestyle(PS_SOLID, 3);
-        line(x, y, pointerX + 2, pointerY + 2);
-
-        // 锟斤拷锟斤拷指锟诫本锟斤拷
-        setcolor(WHITE);
-        setlinestyle(PS_SOLID, 2);
-        line(x, y, pointerX, pointerY);
-
-        // 锟斤拷锟斤拷锟斤拷锟斤拷装锟斤拷
-        setfillcolor(RGB(40, 40, 40));
-        fillcircle(x, y, 8);
-        setfillcolor(valueColor);
-        fillcircle(x, y, 4);
-
-        // 锟斤拷锟狡憋拷签锟斤拷��斤拷值
-        settextstyle(20, 0, _T("Arial"));
-        settextcolor(valueColor);
-        TCHAR valueText[32];
-        if (isN1Dial) {
-            _stprintf_s(valueText, _T("%s: %.1f%%"), label, valueToDisplay);
-        }
-        else {
-            _stprintf_s(valueText, _T("%s: %.1f"), label, value);
-        }
-        outtextxy(x - 40, y + radius + 10, valueText);
-    }
-
-    void drawDials() {
-        // 锟斤拷一锟斤拷 - 锟襟发讹拷锟斤拷锟斤拷锟斤拷锟斤拷
-        drawArcDial(DIAL_START_X, DIAL_START_Y, DIAL_RADIUS,
-            engine->getSpeedSensor1()->getValue(), 40000, _T("N1-L1"), RGB(0, 255, 0));
-        drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y, DIAL_RADIUS,
-            engine->getSpeedSensor2()->getValue(), 40000, _T("N1-L2"), RGB(0, 255, 0));
-        drawArcDial(DIAL_START_X + DIAL_SPACING_X * 2, DIAL_START_Y, DIAL_RADIUS,
-            engine->getEgtSensor1()->getValue(), 1200, _T("EGT-L1"), RGB(255, 128, 0));
-        drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y, DIAL_RADIUS,
-            engine->getEgtSensor2()->getValue(), 1200, _T("EGT-L2"), RGB(255, 128, 0));
-
-        // 锟节讹拷锟斤拷 - 锟揭凤拷锟斤拷锟斤拷锟斤拷锟斤拷?? (锟斤拷锟斤拷锟剿达拷直锟斤拷锟�)
-        drawArcDial(DIAL_START_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-            engine->getSpeedSensor1()->getValue(), 40000, _T("N1-R1"), RGB(0, 255, 0));
-        drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-            engine->getSpeedSensor2()->getValue(), 40000, _T("N1-R2"), RGB(0, 255, 0));
-        drawArcDial(DIAL_START_X + DIAL_SPACING_X * 2, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-            engine->getEgtSensor1()->getValue(), 1200, _T("EGT-R1"), RGB(255, 128, 0));
-        drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-            engine->getEgtSensor2()->getValue(), 1200, _T("EGT-R2"), RGB(255, 128, 0));
-    }
-
-    void drawButton(const Button& btn) {
-        // 锟斤���锟狡帮拷钮锟斤拷锟斤拷
-        setfillcolor(btn.pressed ? RGB(150, 150, 150) : btn.bgColor);
-        solidroundrect(btn.x, btn.y, btn.x + btn.width, btn.y + btn.height, 10, 10);
-
-        // 锟斤拷锟狡帮拷钮锟斤拷
-        settextstyle(20, 0, _T("Arial"));
-        setbkmode(TRANSPARENT);
-        settextcolor(btn.textColor);
-
-        // 锟斤拷锟斤拷锟斤拷锟斤拷位锟斤拷使锟斤拷锟斤拷锟�
-        int textWidth = textwidth(btn.text);
-        int textHeight = textheight(btn.text);
-        int textX = btn.x + (btn.width - textWidth) / 2;
-        int textY = btn.y + (btn.height - textHeight) / 2;
-
-        outtextxy(textX, textY, btn.text);
-    }
-
-    void drawStatus(bool isStarting, bool isRunning) {
-        settextstyle(24, 0, _T("Arial"));
-        settextcolor(WHITE);
-        if (!isStarting) {
-            setfillcolor(RGB(0, 200, 0));
-            solidroundrect(50, 20, 150, 50, 10, 10);
-            settextcolor(BLACK);
-            outtextxy(60, 25, _T("   start"));
-        }
-
-        if (!isRunning) {
-            setfillcolor(RGB(0, 200, 0));
-            solidroundrect(170, 20, 270, 50, 10, 10);
-            settextcolor(BLACK);
-            outtextxy(185, 25, _T("   run"));
-        }
-        if (isStarting) {
-            setfillcolor(RGB(0, 255, 0));
-            solidroundrect(50, 20, 150, 50, 10, 10);
-            settextcolor(BLACK);
-            outtextxy(60, 25, _T("   start"));
-        }
-
-        if (isRunning) {
-            setfillcolor(RGB(0, 255, 0));
-            solidroundrect(170, 20, 270, 50, 10, 10);
-            settextcolor(BLACK);
-            outtextxy(185, 25, _T("   run"));
-        }
-    }
-
-    void drawWarningBox(const string& message, WarningLevel level, bool isActive, int x, int y) {
-        COLORREF boxColor;
-        switch (level) {
-        case NORMAL: boxColor = WHITE; break;
-        case CAUTION: boxColor = RGB(255, 128, 0); break;  // ���斤拷锟斤拷色
-        case WARNING: boxColor = RGB(255, 0, 0); break;    // 锟斤拷色
-        default: boxColor = RGB(128, 128, 128);            // 锟斤拷色
-        }
-
-        // 锟斤拷锟狡撅拷锟斤拷锟竭匡拷效锟斤拷
-        // 锟斤拷呖锟�
-        setfillcolor(RGB(30, 30, 30));
-        solidrectangle(x - 2, y - 2, x + WARNING_BOX_WIDTH + 2, y + WARNING_BOX_HEIGHT + 2);
-
-        // 锟节诧拷锟斤拷???
-        setfillcolor(isActive ? RGB(60, 60, 60) : RGB(40, 40, 40));
-        solidrectangle(x, y, x + WARNING_BOX_WIDTH, y + WARNING_BOX_HEIGHT);
-
-        // 锟斤拷锟狡边匡拷
-        setcolor(isActive ? boxColor : RGB(80, 80, 80));
-        rectangle(x - 1, y - 1, x + WARNING_BOX_WIDTH + 1, y + WARNING_BOX_HEIGHT + 1);
-
-        // 锟斤拷锟狡撅拷锟斤拷锟侥憋拷
-        settextstyle(16, 0, _T("Arial"));
-        settextcolor(isActive ? boxColor : RGB(128, 128, 128));
-        wstring wstr(message.begin(), message.end());
-        outtextxy(x + 10, y + 5, wstr.c_str());
-
-        // 锟斤拷锟斤拷锟斤拷婕わ拷睿�锟斤拷锟斤拷锟斤拷锟斤拷锟街甘撅拷锟
-        if (isActive) {
-            setfillcolor(boxColor);
-            solidrectangle(x, y, x + 3, y + WARNING_BOX_HEIGHT);
-        }
-    }
-
-    void drawAllWarningBoxes() {
-        int x = WARNING_START_X;
-        int y = WARNING_START_Y;
-        const vector<WarningMessage>& warnings = engine->getWarnings();
-
-        // 锟斤拷锟斤拷锟斤拷锟叫匡拷锟杰的撅拷锟斤拷
-        struct WarningDef {
-            string message;
-            WarningLevel level;
-        };
-
-        WarningDef allWarnings[] = {
-            // 锟斤拷锟斤拷锟斤拷锟届常
-            {"Single N1 Sensor Failure", NORMAL},           // 锟斤拷锟斤拷转锟劫达拷锟斤拷锟斤拷锟斤拷锟斤拷
-            {"Engine N1 Sensor Failure", CAUTION},          // 锟斤拷锟斤拷转锟劫达拷锟斤拷锟斤拷锟斤拷锟斤拷
-            {"Single EGT Sensor Failure", NORMAL},          // 锟斤拷锟斤拷EGT锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-            {"Engine EGT Sensor Failure", CAUTION},         // 锟斤拷锟斤拷EGT锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-            {"Dual Engine Sensor Failure - Shutdown", WARNING},  // 双锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-
-            // 燃锟斤拷锟届常
-            {"Low Fuel Level", CAUTION},                    // 燃锟斤拷锟斤拷锟斤拷锟斤拷
-            {"Fuel Sensor Failure", WARNING},               // 燃锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-            {"Fuel Flow Exceeded Limit", CAUTION},          // 燃锟斤拷锟斤拷锟劫筹拷锟斤拷
-
-            // 转锟斤拷锟届常
-            {"N1 Overspeed Level 1", CAUTION},             // 锟斤拷转1
-            {"N1 Overspeed Level 2 - Engine Shutdown", WARNING}, // 锟斤拷转2
-
-            // 锟铰讹拷锟届常
-            {"EGT Overtemp Level 1 During Start", CAUTION},      // 锟斤拷锟斤拷1
-            {"EGT Overtemp Level 2 During Start - Shutdown", WARNING}, // 锟斤拷锟斤拷2
-            {"EGT Overtemp Level 1 During Run", CAUTION},        // 锟斤拷锟斤拷3
-            {"EGT Overtemp Level 2 During Run - Shutdown", WARNING}    // 锟斤拷锟斤拷4
-        };
-
-        // 锟斤拷锟斤拷锟斤拷锟叫撅拷锟斤拷锟�
-        for (const auto& warningDef : allWarnings) {
-            bool isActive = false;
-
-            // 锟斤拷��鼻帮拷锟斤拷锟斤拷欠窦せ锟�
-            for (const auto& warning : warnings) {
-                // 锟斤拷锟斤拷锟较⑵ワ拷洳�锟斤拷时锟斤拷锟斤拷5锟斤拷锟斤拷
-                if (warning.message == warningDef.message &&
-                    warning.timestamp >= engine->getCurrentTime() - 5.0) {
-                    isActive = true;
-                    break;
-                }
+            // 绘制警告测试按钮
+            for (int i = 0; i < 14; i++) {
+                drawButton(warningButtons[i]);
             }
 
-            drawWarningBox(warningDef.message, warningDef.level, isActive, x, y);
-            y += WARNING_BOX_HEIGHT + WARNING_SPACING;
+            SetWorkingImage(NULL);
+            putimage(0, 0, backBuffer);
 
-            // 每6锟斤拷锟斤拷锟芥换锟斤拷
-            if (y > WARNING_START_Y + 6 * (WARNING_BOX_HEIGHT + WARNING_SPACING)) {
-                x += WARNING_BOX_WIDTH + WARNING_SPACING;
-                y = WARNING_START_Y;
+            lastFrameTime = currentTime;
+        }
+
+        bool checkButtonClick(const Button& btn, int mouseX, int mouseY) {
+            return mouseX >= btn.x && mouseX <= btn.x + btn.width &&
+                mouseY >= btn.y && mouseY <= btn.y + btn.height;
+        }
+
+        // 在现有的鼠标检查代码中添加新按钮的检查
+        void handleMouseClick(int mouseX, int mouseY) {
+            if (checkButtonClick(startButton, mouseX, mouseY)) {
+                engine->start();
             }
-        }
-    }
-
-    void drawFuelFlow() {
-        double fuelFlow = engine->getFuelFlow();
-
-        // 锟斤拷锟斤拷燃锟斤拷锟斤拷锟劫撅拷锟斤拷锟斤拷色
-        COLORREF textColor, borderColor, bgColor;
-        if (fuelFlow > 0) {
-            if (fuelFlow > 50) {
-                // 燃锟斤拷锟斤拷锟劫筹拷锟斤拷 - 锟斤拷锟斤拷色锟斤拷锟斤拷
-                textColor = RGB(255, 128, 0);   // 锟斤拷锟斤拷色锟斤拷锟斤拷
-                borderColor = RGB(255, 128, 0); // 锟斤拷锟���拷色锟竭匡拷
-                bgColor = RGB(40, 40, 40);      // 锟斤拷锟斤拷色锟斤拷锟斤拷
+            else if (checkButtonClick(stopButton, mouseX, mouseY)) {
+                engine->stop();
             }
-            else {
-                // 锟斤拷锟斤拷锟斤拷锟斤拷状态 - 锟斤拷色
-                textColor = WHITE;              // 锟斤拷色锟斤拷锟斤拷
-                borderColor = RGB(100, 100, 100); // 锟斤拷锟缴�锟竭匡拷
-                bgColor = RGB(40, 40, 40);       // 锟斤拷锟斤拷色锟斤拷锟斤拷
+            else if (checkButtonClick(increaseThrust, mouseX, mouseY)) {
+                engine->increaseThrust();
             }
-        }
-        else {
-            // 锟斤拷锟斤拷锟斤拷状态 - 锟斤拷色
-            textColor = RGB(150, 150, 150);   // 锟斤拷色锟斤拷锟斤拷
-            borderColor = RGB(100, 100, 100); // 锟斤拷锟缴�锟竭匡拷
-            bgColor = RGB(40, 40, 40);       // 锟斤拷锟斤拷色锟斤拷锟斤拷
-        }
+            else if (checkButtonClick(decreaseThrust, mouseX, mouseY)) {
+                engine->decreaseThrust();
+            }
 
-        // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷式
-        settextstyle(24, 0, _T("Arial"));
-        settextcolor(textColor);
-
-        // 锟斤拷锟斤拷锟斤拷示锟侥憋拷
-        TCHAR flowText[64];
-        _stprintf_s(flowText, _T("Fuel Flow: %.1f kg/h"), fuelFlow);
-
-        // 锟斤拷锟斤拷锟斤拷示位锟斤拷
-        int x = 50;
-        int y = 560;
-        int width = 200;
-        int height = 30;
-
-        // 锟斤拷锟斤拷锟斤拷呖锟斤拷���接靶э拷锟�
-        setfillcolor(RGB(30, 30, 30));
-        solidrectangle(x - 1, y - 1, x + width + 1, y + height + 1);
-
-        // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷
-        setfillcolor(bgColor);
-        solidrectangle(x, y, x + width, y + height);
-
-        // 锟斤拷锟狡边匡拷
-        setcolor(borderColor);
-        rectangle(x, y, x + width, y + height);
-
-        // 锟斤拷锟斤拷锟斤拷诨锟皆咀刺�锟斤拷��斤拷锟斤拷锟斤拷锟街甘撅拷锟�
-        if (fuelFlow > 0) {
-            setfillcolor(borderColor);
-            solidrectangle(x, y, x + 3, y + height);
-        }
-
-        // 锟斤拷锟斤拷锟斤拷锟斤拷锟斤拷微锟斤拷锟斤拷偏锟斤拷锟皆避匡拷锟斤拷锟街甘撅拷锟斤拷锟
-        outtextxy(x + 10, y + (height - textheight(flowText)) / 2, flowText);
-    }
-
-    void update() {
-        ULONGLONG currentTime = GetTickCount64();
-        ULONGLONG deltaTime = currentTime - lastFrameTime;
-
-        if (deltaTime < FRAME_TIME) {
-            return;
-        }
-
-        SetWorkingImage(backBuffer);
-        cleardevice();
-
-        drawDials();
-        drawButton(startButton);
-        drawButton(stopButton);
-        drawButton(increaseThrust);
-        drawButton(decreaseThrust);
-        drawStatus(engine->getIsStarting(), engine->getIsRunning());
-        drawAllWarningBoxes();
-        drawFuelFlow();  // 确锟斤拷锟斤拷锟斤拷锟斤拷元锟斤拷之锟斤拷锟斤拷锟�
-
-        // 绘制警告测试按钮
-        for (int i = 0; i < 14; i++) {
-            drawButton(warningButtons[i]);
-        }
-
-        SetWorkingImage(NULL);
-        putimage(0, 0, backBuffer);
-
-        lastFrameTime = currentTime;
-    }
-
-    bool checkButtonClick(const Button& btn, int mouseX, int mouseY) {
-        return mouseX >= btn.x && mouseX <= btn.x + btn.width &&
-            mouseY >= btn.y && mouseY <= btn.y + btn.height;
-    }
-
-    // 在现有的鼠标检查代码中添加新按钮的检查
-    void handleMouseClick(int mouseX, int mouseY) {
-        if (checkButtonClick(startButton, mouseX, mouseY)) {
-            engine->start();
-        }
-        else if (checkButtonClick(stopButton, mouseX, mouseY)) {
-            engine->stop();
-        }
-        else if (checkButtonClick(increaseThrust, mouseX, mouseY)) {
-            engine->increaseThrust();
-        }
-        else if (checkButtonClick(decreaseThrust, mouseX, mouseY)) {
-            engine->decreaseThrust();
-        }
-
-        // 检查警告测试按钮
-        for (int i = 0; i < 14; i++) {
-            if (checkButtonClick(warningButtons[i], mouseX, mouseY)) {
-                switch (i) {
-                case 0: // Single N1 Sensor
-                    engine->getSpeedSensor1()->setValidity(false);  // L1传感器失效
-                    engine->getSpeedSensor2()->setValidity(true);   // 确保L2传感器正常
-                    // 立即触发警告检查
-                    engine->checkWarnings(engine->getCurrentTime());
-                    break;
-                case 1: // Dual N1 Sensors
-                    engine->getSpeedSensor1()->setValidity(false);
-                    engine->getSpeedSensor2()->setValidity(false);
-                    engine->checkWarnings(engine->getCurrentTime());
-                    break;
-                case 2: // Single EGT Sensor
-                    engine->getEgtSensor1()->setValidity(false);
-                    engine->getEgtSensor2()->setValidity(true);
-                    break;
-                case 3: // Dual EGT Sensors
-                    engine->getEgtSensor1()->setValidity(false);
-                    engine->getEgtSensor2()->setValidity(false);
-                    break;
-                case 4: // Low Fuel
-                    engine->setFuelAmount(900);  // 设置接近低油量警告阈值
-                    break;
-                case 5: // Fuel Sensor
-                    engine->getFuelSensor()->setValidity(false);
-                    break;
-                case 6: // High Fuel Flow
-                    if (engine->getIsRunning()) {
-                        engine->setFuelFlow(52.0);  // 设置超过燃油流量限制
+            // 检查警告测试按钮
+            for (int i = 0; i < 14; i++) {
+                if (checkButtonClick(warningButtons[i], mouseX, mouseY)) {
+                    switch (i) {
+                    case 0: // Single N1 Sensor
+                        engine->getSpeedSensor1()->setValidity(false);  // L1传感器失效
+                        engine->getSpeedSensor2()->setValidity(true);   // 确保L2传感器正常
+                        // 立即触发警告检查
+                        engine->checkWarnings(engine->getCurrentTime());
+                        break;
+                    case 1: // Dual N1 Sensors
+                        engine->getSpeedSensor1()->setValidity(false);
+                        engine->getSpeedSensor2()->setValidity(false);
+                        engine->checkWarnings(engine->getCurrentTime());
+                        break;
+                    case 2: // Single EGT Sensor
+                        engine->getEgtSensor1()->setValidity(false);
+                        engine->getEgtSensor2()->setValidity(true);
+                        break;
+                    case 3: // Dual EGT Sensors
+                        engine->getEgtSensor1()->setValidity(false);
+                        engine->getEgtSensor2()->setValidity(false);
+                        break;
+                    case 4: // Low Fuel
+                        engine->setFuelAmount(900);  // 设置接近低油量警告阈值
+                        break;
+                    case 5: // Fuel Sensor
+                        engine->getFuelSensor()->setValidity(false);
+                        break;
+                    case 6: // High Fuel Flow
+                        if (engine->getIsRunning()) {
+                            engine->setFuelFlow(52.0);  // 设置超过燃油流量限制
+                        }
+                        break;
+                    case 7: // N1 Overspeed L1
+                        if (engine->getIsRunning()) {
+                            engine->setN1(107.0);  // 设置N1超过105%但小于120%
+                        }
+                        break;
+                    case 8: // N1 Overspeed L2
+                        if (engine->getIsRunning()) {
+                            engine->setN1(122.0);  // 设置N1超过120%
+                        }
+                        break;
+                    case 9: // EGT Start L1
+                        if (engine->getIsStarting()) {
+                            engine->setTemperature(880.0);  // 设置启动时EGT接近850度警告值
+                        }
+                        break;
+                    case 10: // EGT Start L2
+                        if (engine->getIsStarting()) {
+                            engine->setTemperature(1020.0);  // 设置启动时EGT超过1000度
+                        }
+                        break;
+                    case 11: // EGT Run L1
+                        if (engine->getIsRunning()) {
+                            engine->setTemperature(970.0);  // 设置运行时EGT接近950度警告值
+                        }
+                        break;
+                    case 12: // EGT Run L2
+                        if (engine->getIsRunning()) {
+                            engine->setTemperature(1120.0);  // 设置运行时EGT超过1100度
+                        }
+                        break;
+                    case 13: // Reset All
+                        // 重置所有参数到正常值
+                        engine->resetSensors();
+                        if (engine->getIsRunning()) {
+                            engine->setN1(95.0);
+                            engine->setTemperature(850.0);
+                            engine->setFuelFlow(40.0);
+                        }
+                        engine->setFuelAmount(20000.0);
+                        break;
                     }
-                    break;
-                case 7: // N1 Overspeed L1
-                    if (engine->getIsRunning()) {
-                        engine->setN1(107.0);  // 设置N1超过105%但小于120%
-                    }
-                    break;
-                case 8: // N1 Overspeed L2
-                    if (engine->getIsRunning()) {
-                        engine->setN1(122.0);  // 设置N1超过120%
-                    }
-                    break;
-                case 9: // EGT Start L1
-                    if (engine->getIsStarting()) {
-                        engine->setTemperature(880.0);  // 设置启动时EGT接近850度警告值
-                    }
-                    break;
-                case 10: // EGT Start L2
-                    if (engine->getIsStarting()) {
-                        engine->setTemperature(1020.0);  // 设置启动时EGT超过1000度
-                    }
-                    break;
-                case 11: // EGT Run L1
-                    if (engine->getIsRunning()) {
-                        engine->setTemperature(970.0);  // 设置运行时EGT接近950度警告值
-                    }
-                    break;
-                case 12: // EGT Run L2
-                    if (engine->getIsRunning()) {
-                        engine->setTemperature(1120.0);  // 设置运行时EGT超过1100度
-                    }
-                    break;
-                case 13: // Reset All
-                    // 重置所有参数到正常值
-                    engine->resetSensors();
-                    if (engine->getIsRunning()) {
-                        engine->setN1(95.0);
-                        engine->setTemperature(850.0);
-                        engine->setFuelFlow(40.0);
-                    }
-                    engine->setFuelAmount(20000.0);
-                    break;
                 }
             }
         }
-    }
-};
+    };
 
 
-int main() {
-    try {
-        srand(static_cast<unsigned int>(time(nullptr)));
+    int main() {
+        try {
+            srand(static_cast<unsigned int>(time(nullptr)));
 
-        Engine engine;
-        GUI gui(800, 600, &engine);
-        DataLogger logger;
+            Engine engine;
+            GUI gui(800, 600, &engine);
+            DataLogger logger;
 
-        ULONGLONG lastUpdateTime = GetTickCount64();
-        ULONGLONG currentTime;
-        const double fixedTimeStep = 1.0 / 200.0;  // 5ms
-        double accumulator = 0.0;
-        double simulationTime = 0.0;  // 模锟斤拷时锟斤拷
+            ULONGLONG lastUpdateTime = GetTickCount64();
+            ULONGLONG currentTime;
+            const double fixedTimeStep = 1.0 / 200.0;  // 5ms
+            double accumulator = 0.0;
+            double simulationTime = 0.0;  // 模拟时间
 
-        bool running = true;
+            bool running = true;
 
-        // 预锟斤拷循锟斤拷
-        for (int i = 0; i < 100; i++) {
-            engine.update(fixedTimeStep);
-        }
-
-        while (running) {
-            currentTime = GetTickCount64();
-            double deltaTime = (currentTime - lastUpdateTime) / 1000.0;
-            if (deltaTime > 0.25) deltaTime = 0.25;
-            lastUpdateTime = currentTime;
-
-            accumulator += deltaTime;
-
-            // 锟斤拷锟斤拷锟斤拷锟斤拷
-            while (MouseHit()) {
-                MOUSEMSG msg = GetMouseMsg();
-                if (msg.uMsg == WM_LBUTTONDOWN) {
-                    gui.handleMouseClick(msg.x, msg.y);
-                }
-            }
-
-            // 锟斤拷锟斤拷锟斤拷锟斤拷
-            while (accumulator >= fixedTimeStep) {
+            // 预热循环
+            for (int i = 0; i < 100; i++) {
                 engine.update(fixedTimeStep);
-                engine.checkWarnings(currentTime / 1000.0);
-
-                // 锟斤拷录锟斤拷锟斤拷 - 使锟矫撅拷确锟斤拷模锟斤拷时锟斤拷
-                logger.logData(
-                    simulationTime,
-                    engine.getN1(),
-                    engine.getTemperature(),
-                    engine.getFuelFlow(),
-                    engine.getFuelAmount()
-                );
-
-                accumulator -= fixedTimeStep;
-                simulationTime += fixedTimeStep;  // 只锟斤拷锟斤拷锟斤拷锟斤拷锟侥ｏ拷锟绞憋拷锟�
             }
 
-            gui.update();
+            while (running) {
+                currentTime = GetTickCount64();
+                double deltaTime = (currentTime - lastUpdateTime) / 1000.0;
+                if (deltaTime > 0.25) deltaTime = 0.25;
+                lastUpdateTime = currentTime;
 
-            if (GetAsyncKeyState(VK_ESCAPE)) {
-                running = false;
+                accumulator += deltaTime;
+
+                // 处理鼠标事件
+                while (MouseHit()) {
+                    MOUSEMSG msg = GetMouseMsg();
+                    if (msg.uMsg == WM_LBUTTONDOWN) {
+                        gui.handleMouseClick(msg.x, msg.y);
+                    }
+                }
+
+                // 更新引擎状态
+                while (accumulator >= fixedTimeStep) {
+                    engine.update(fixedTimeStep);
+                    engine.checkWarnings(currentTime / 1000.0);
+
+                    // 记录日志 - 确保模拟时间一致
+                    logger.logData(
+                        simulationTime,
+                        engine.getN1(),
+                        engine.getTemperature(),
+                        engine.getFuelFlow(),
+                        engine.getFuelAmount()
+                    );
+
+                    accumulator -= fixedTimeStep;
+                    simulationTime += fixedTimeStep;  // 只在这里增加模拟时间
+                }
+
+                gui.update();
+
+                if (GetAsyncKeyState(VK_ESCAPE)) {
+                    running = false;
+                }
+
+                // 确保循环时间
+                ULONGLONG endTime = GetTickCount64();
+                ULONGLONG elapsedTime = endTime - currentTime;
+                if (elapsedTime < 5) {
+                    Sleep(5 - elapsedTime);
+                }
             }
 
-            // 锟斤拷确锟斤拷锟斤拷循锟斤拷时锟斤拷
-            ULONGLONG endTime = GetTickCount64();
-            ULONGLONG elapsedTime = endTime - currentTime;
-            if (elapsedTime < 5) {
-                Sleep(5 - elapsedTime);
-            }
+            closegraph();
+            return 0;
         }
+        catch (const std::exception& e) {
+            int size_needed = MultiByteToWideChar(CP_UTF8, 0, e.what(), -1, NULL, 0);
+            wchar_t* wstrError = new wchar_t[size_needed];
+            MultiByteToWideChar(CP_UTF8, 0, e.what(), -1, wstrError, size_needed);
 
-        closegraph();
-        return 0;
+            MessageBox(NULL, wstrError, L"Error", MB_OK | MB_ICONERROR);
+
+            delete[] wstrError;
+            return 1;
+        }
     }
-    catch (const std::exception& e) {
-        int size_needed = MultiByteToWideChar(CP_UTF8, 0, e.what(), -1, NULL, 0);
-        wchar_t* wstrError = new wchar_t[size_needed];
-        MultiByteToWideChar(CP_UTF8, 0, e.what(), -1, wstrError, size_needed);
-
-        MessageBox(NULL, wstrError, L"Error", MB_OK | MB_ICONERROR);
-
-        delete[] wstrError;
-        return 1;
-    }
-}
