@@ -21,10 +21,14 @@ using namespace std;
 // 确保 Engine 正确使用 DataLogger
 class Engine {
 private:
-    Sensor* speedSensor1;
-    Sensor* speedSensor2;
-    Sensor* egtSensor1;
-    Sensor* egtSensor2;
+    Sensor* speedSensorL1;  // 左发N1传感器1
+    Sensor* speedSensorL2;  // 左发N1传感器2
+    Sensor* speedSensorR1;  // 右发N1传感器1
+    Sensor* speedSensorR2;  // 右发N1传感器2
+    Sensor* egtSensorL1;  // 左发EGT传感器1
+    Sensor* egtSensorL2;  // 左发EGT传感器2
+    Sensor* egtSensorR1;  // 右发EGT传感器1
+    Sensor* egtSensorR2;  // 右发EGT传感器2
     Sensor* fuelSensor;  // 燃油传感器
     double fuelFlow;
     double fuelAmount;
@@ -75,9 +79,14 @@ private:
     }
 public:
     // Engine
-    Sensor* getSpeedSensor2() { return speedSensor2; }
-    Sensor* getEgtSensor1() { return egtSensor1; }
-    Sensor* getEgtSensor2() { return egtSensor2; }
+    Sensor* getSpeedSensorL1() { return speedSensorL1; }
+    Sensor* getSpeedSensorL2() { return speedSensorL2; }
+    Sensor* getSpeedSensorR1() { return speedSensorR1; }
+    Sensor* getSpeedSensorR2() { return speedSensorR2; }
+    Sensor* getEgtSensorL1() { return egtSensorL1; }
+    Sensor* getEgtSensorL2() { return egtSensorL2; }
+    Sensor* getEgtSensorR1() { return egtSensorR1; }
+    Sensor* getEgtSensorR2() { return egtSensorR2; }
     double getN1() const { return N1; }
     double getTemperature() const { return temperature; }
     double getFuelFlow() const { return fuelFlow; }
@@ -109,10 +118,14 @@ public:
         }
     }
     Engine() {
-        speedSensor1 = new Sensor();
-        speedSensor2 = new Sensor();
-        egtSensor1 = new Sensor();
-        egtSensor2 = new Sensor();
+        speedSensorL1 = new Sensor();
+        speedSensorL2 = new Sensor();
+        speedSensorR1 = new Sensor();
+        speedSensorR2 = new Sensor();
+        egtSensorL1 = new Sensor();
+        egtSensorL2 = new Sensor();
+        egtSensorR1 = new Sensor();
+        egtSensorR2 = new Sensor();
         fuelSensor = new Sensor();  // 初始化燃油传感器
         fuelFlow = 0;
         fuelAmount = 20000;
@@ -131,13 +144,13 @@ public:
         isThrusting = false;  // 初始化推力状态
 
         // 初始化EGT传感器
-        egtSensor1->setValue(T0);
-        egtSensor2->setValue(T0);
+        egtSensorL1->setValue(T0);
+        egtSensorL2->setValue(T0);
+        egtSensorR1->setValue(T0);
+        egtSensorR2->setValue(T0);
         logger = new DataLogger();  // 初始化日志记录器
         lastWarningTimes.clear();  // 确保警告时间映射为空
     }
-
-    Sensor* getSpeedSensor1() { return speedSensor1; }
 
     void updateStartPhase(double timeStep) {
         isThrusting = false;
@@ -152,13 +165,17 @@ public:
             double speed = 10000.0 * accumulatedTime;
             N1 = (speed / RATED_SPEED) * 100.0;
 
-            speedSensor1->setValue(speed);
-            speedSensor2->setValue(speed);
+            speedSensorL1->setValue(speed);
+            speedSensorL2->setValue(speed);
+            speedSensorR1->setValue(speed);
+            speedSensorR2->setValue(speed);
             fuelFlow = 5.0 * accumulatedTime;
             temperature = T0;  // 初始温度
 
-            egtSensor1->setValue(temperature);
-            egtSensor2->setValue(temperature);
+            egtSensorL1->setValue(temperature);
+            egtSensorL2->setValue(temperature);
+            egtSensorR1->setValue(temperature);
+            egtSensorR2->setValue(temperature);
 
             isStarting = true;
         }
@@ -168,8 +185,10 @@ public:
             double speed = 20000.0 + 23000.0 * log10(1.0 + t);
             N1 = (speed / RATED_SPEED) * 100.0;
 
-            speedSensor1->setValue(speed);
-            speedSensor2->setValue(speed);
+            speedSensorL1->setValue(speed);
+            speedSensorL2->setValue(speed);
+            speedSensorR1->setValue(speed);
+            speedSensorR2->setValue(speed);
             fuelFlow = 10.0 + 42.0 * log10(1.0 + t);
 
             // 计算温度 T = 900*lg(t-1) + T0
@@ -178,12 +197,16 @@ public:
             double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
             double displaySpeed = speed * randFactor;
 
-            speedSensor1->setValue(displaySpeed);
-            speedSensor2->setValue(displaySpeed);
+            speedSensorL1->setValue(displaySpeed);
+            speedSensorL2->setValue(displaySpeed);
+            speedSensorR1->setValue(displaySpeed);
+            speedSensorR2->setValue(displaySpeed);
             temperature *= randFactor;
 
-            egtSensor1->setValue(temperature);
-            egtSensor2->setValue(temperature);
+            egtSensorL1->setValue(temperature);
+            egtSensorL2->setValue(temperature);
+            egtSensorR1->setValue(temperature);
+            egtSensorR2->setValue(temperature);
 
             // N1达到95%转速
             if (N1 >= 95.0) {
@@ -233,8 +256,10 @@ public:
         N1 = (speed / RATED_SPEED) * 100.0;
 
         // 更新传感器值
-        speedSensor1->setValue(speed);
-        speedSensor2->setValue(speed);
+        speedSensorL1->setValue(speed);
+        speedSensorL2->setValue(speed);
+        speedSensorR1->setValue(speed);
+        speedSensorR2->setValue(speed);
 
         // 温度 - 目标温度为850度
         double targetTemp = 850.0;  // 目标温度
@@ -246,8 +271,10 @@ public:
         // 随机因子调整温度
         temperature *= randFactor;
 
-        egtSensor1->setValue(temperature);
-        egtSensor2->setValue(temperature);
+        egtSensorL1->setValue(temperature);
+        egtSensorL2->setValue(temperature);
+        egtSensorR1->setValue(temperature);
+        egtSensorR2->setValue(temperature);
 
         // 燃油流量
         if (fuelFlow > 0) {
@@ -263,11 +290,15 @@ public:
 
         // 更新转速
         double speed = (N1 / 100.0) * RATED_SPEED * randFactor;
-        speedSensor1->setValue(speed);
-        speedSensor2->setValue(speed);
+        speedSensorL1->setValue(speed);
+        speedSensorL2->setValue(speed);
+        speedSensorR1->setValue(speed);
+        speedSensorR2->setValue(speed);
 
-        egtSensor1->setValue(temperature * randFactor);
-        egtSensor2->setValue(temperature * randFactor);
+        egtSensorL1->setValue(temperature * randFactor);
+        egtSensorL2->setValue(temperature * randFactor);
+        egtSensorR1->setValue(temperature * randFactor);
+        egtSensorR2->setValue(temperature * randFactor);
 
         // 燃油流量
         if (fuelFlow > 0) {
@@ -307,10 +338,14 @@ public:
         double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
         double displaySpeed = (N1 / 100.0) * RATED_SPEED * randFactor;
 
-        speedSensor1->setValue(displaySpeed);
-        speedSensor2->setValue(displaySpeed);
-        egtSensor1->setValue(temperature);
-        egtSensor2->setValue(temperature);
+        speedSensorL1->setValue(displaySpeed);
+        speedSensorL2->setValue(displaySpeed);
+        speedSensorR1->setValue(displaySpeed);
+        speedSensorR2->setValue(displaySpeed);
+        egtSensorL1->setValue(temperature);
+        egtSensorL2->setValue(temperature);
+        egtSensorR1->setValue(temperature);
+        egtSensorR2->setValue(temperature);
 
         // 输出停止阶段状态
         std::cout << "Stop Phase - Time: " << elapsedStopTime
@@ -320,35 +355,63 @@ public:
 
     void checkWarnings(double currentTime) {
         // 检查传感器有效性
-        bool n1L1Failed = !speedSensor1->getValidity();
-        bool n1L2Failed = !speedSensor2->getValidity();
-        bool egtL1Failed = !egtSensor1->getValidity();
-        bool egtL2Failed = !egtSensor2->getValidity();
+        bool n1L1Failed = !speedSensorL1->getValidity();
+        bool n1L2Failed = !speedSensorL2->getValidity();
+        bool n1R1Failed = !speedSensorR1->getValidity();
+        bool n1R2Failed = !speedSensorR2->getValidity();
+        bool egtL1Failed = !egtSensorL1->getValidity();
+        bool egtL2Failed = !egtSensorL2->getValidity();
+        bool egtR1Failed = !egtSensorR1->getValidity();
+        bool egtR2Failed = !egtSensorR2->getValidity();
 
         // 检查N1传感器故障
-        if (n1L1Failed && !n1L2Failed) {
+        if (n1L1Failed && !n1L2Failed && !n1R1Failed && !n1R2Failed) {
             addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
         }
-        if (!n1L1Failed && n1L2Failed) {
+        if (!n1L1Failed && n1L2Failed && !n1R1Failed && !n1R2Failed) {
             addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
         }
-        if (n1L1Failed && n1L2Failed) {
+        if (!n1L1Failed && !n1L2Failed && n1R1Failed && !n1R2Failed) {
+            addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
+        }
+        if (!n1L1Failed && !n1L2Failed && !n1R1Failed && n1R2Failed) {
+            addWarning("Single N1 Sensor Failure", NORMAL, currentTime);
+        }
+        if (n1L1Failed && n1L2Failed && !n1R1Failed && !n1R2Failed) {
+            addWarning("Engine N1 Sensor Failure", CAUTION, currentTime);
+        }
+        if (!n1L1Failed && !n1L2Failed && n1R1Failed && !n1R2Failed) {
+            addWarning("Engine N1 Sensor Failure", CAUTION, currentTime);
+        }
+        if (!n1L1Failed && !n1L2Failed && !n1R1Failed && n1R2Failed) {
             addWarning("Engine N1 Sensor Failure", CAUTION, currentTime);
         }
 
         // 检查EGT传感器故障
-        if (egtL1Failed && !egtL2Failed) {
+        if (egtL1Failed && !egtL2Failed && !egtR1Failed && !egtR2Failed) {
             addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
         }
-        if (!egtL1Failed && egtL2Failed) {
+        if (!egtL1Failed && egtL2Failed && !egtR1Failed && !egtR2Failed) {
             addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
         }
-        if (egtL1Failed && egtL2Failed) {
+        if (!egtL1Failed && !egtL2Failed && egtR1Failed && !egtR2Failed) {
+            addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
+        }
+        if (!egtL1Failed && !egtL2Failed && !egtR1Failed && egtR2Failed) {
+            addWarning("Single EGT Sensor Failure", NORMAL, currentTime);
+        }
+        if (egtL1Failed && egtL2Failed && !egtR1Failed && !egtR2Failed) {
+            addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
+        }
+        if (!egtL1Failed && !egtL2Failed && egtR1Failed && !egtR2Failed) {
+            addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
+        }
+        if (!egtL1Failed && !egtL2Failed && !egtR1Failed && egtR2Failed) {
             addWarning("Engine EGT Sensor Failure", CAUTION, currentTime);
         }
 
         // 双发动机传感器故障检查
-        if ((n1L1Failed && n1L2Failed) && (egtL1Failed && egtL2Failed)) {
+        if ((n1L1Failed && n1L2Failed && !n1R1Failed && !n1R2Failed) && (egtL1Failed && egtL2Failed && !egtR1Failed && !egtR2Failed)) {
             addWarning("Dual Engine Sensor Failure - Shutdown", WARNING, currentTime);
             stop();
         }
@@ -428,15 +491,19 @@ public:
         }
 
         // 更新传感器显示值
-        speedSensor1->setValue(newSpeed);
-        speedSensor2->setValue(newSpeed);
+        speedSensorL1->setValue(newSpeed);
+        speedSensorL2->setValue(newSpeed);
+        speedSensorR1->setValue(newSpeed);
+        speedSensorR2->setValue(newSpeed);
 
         // 更新温度
         temperature = temperature * (1.0 + changeRatio);
 
         // 更新EGT传感器值
-        egtSensor1->setValue(temperature);
-        egtSensor2->setValue(temperature);
+        egtSensorL1->setValue(temperature);
+        egtSensorL2->setValue(temperature);
+        egtSensorR1->setValue(temperature);
+        egtSensorR2->setValue(temperature);
 
         // 输出当前状态
         std::cout << "Thrust increased - N1: " << N1
@@ -472,15 +539,19 @@ public:
         }
 
         // 更新传感器显示值
-        speedSensor1->setValue(newSpeed);
-        speedSensor2->setValue(newSpeed);
+        speedSensorL1->setValue(newSpeed);
+        speedSensorL2->setValue(newSpeed);
+        speedSensorR1->setValue(newSpeed);
+        speedSensorR2->setValue(newSpeed);
 
         // 更新温度
         temperature = temperature * (1.0 - changeRatio);
 
         // 更新EGT传感器值
-        egtSensor1->setValue(temperature);
-        egtSensor2->setValue(temperature);
+        egtSensorL1->setValue(temperature);
+        egtSensorL2->setValue(temperature);
+        egtSensorR1->setValue(temperature);
+        egtSensorR2->setValue(temperature);
 
         // 输出当前状态
         std::cout << "Thrust decreased - N1: " << N1
@@ -492,18 +563,18 @@ public:
     void simulateSensorFailure(int sensorType) {
         switch (sensorType) {
         case 0: // 单个N1传感器故障
-            speedSensor1->setValidity(false);
+            speedSensorL1->setValidity(false);
             break;
         case 1: // 双N1传感器故障
-            speedSensor1->setValidity(false);
-            speedSensor2->setValidity(false);
+            speedSensorL1->setValidity(false);
+            speedSensorL2->setValidity(false);
             break;
         case 2: // 单个EGT传感器故障
-            egtSensor1->setValidity(false);
+            egtSensorL1->setValidity(false);
             break;
-        case 3: // 双EGT传���器故障
-            egtSensor1->setValidity(false);
-            egtSensor2->setValidity(false);
+        case 3: // 双EGT传感器故障
+            egtSensorL1->setValidity(false);
+            egtSensorL2->setValidity(false);
             break;
             // ... 其他故障类型
         }
@@ -518,10 +589,14 @@ public:
 
     // 析构函数，释放资源
     ~Engine() {
-        delete speedSensor1;
-        delete speedSensor2;
-        delete egtSensor1;
-        delete egtSensor2;
+        delete speedSensorL1;
+        delete speedSensorL2;
+        delete speedSensorR1;
+        delete speedSensorR2;
+        delete egtSensorL1;
+        delete egtSensorL2;
+        delete egtSensorR1;
+        delete egtSensorR2;
         delete fuelSensor;  // 删除燃油传感器
         if (logger) {
             delete logger;  // 安全删除日志记录器
@@ -537,10 +612,14 @@ public:
     void setTemperature(double temp) { temperature = temp; }
 
     void resetSensors() {
-        speedSensor1->setValidity(true);
-        speedSensor2->setValidity(true);
-        egtSensor1->setValidity(true);
-        egtSensor2->setValidity(true);
+        speedSensorL1->setValidity(true);
+        speedSensorL2->setValidity(true);
+        speedSensorR1->setValidity(true);
+        speedSensorR2->setValidity(true);
+        egtSensorL1->setValidity(true);
+        egtSensorL2->setValidity(true);
+        egtSensorR1->setValidity(true);
+        egtSensorR2->setValidity(true);
         fuelSensor->setValidity(true);
     }
 
@@ -575,7 +654,7 @@ public:
         ULONGLONG lastFrameTime;
         IMAGE* backBuffer;
         Engine* engine;
-        // 确保 engine 指针���效
+        // 确保 engine 指针有效
 
     public:
         struct Button {
@@ -816,16 +895,16 @@ public:
             TCHAR valueText[32];
             
             // 判断是否为N1表盘且对应的传感器无效
-            bool isInvalidN1L1 = _tcscmp(label, _T("N1-L1")) == 0 && !engine->getSpeedSensor1()->getValidity();
-            bool isInvalidN1L2 = _tcscmp(label, _T("N1-L2")) == 0 && !engine->getSpeedSensor2()->getValidity();
-            bool isInvalidN1R1 = _tcscmp(label, _T("N1-R1")) == 0 && !engine->getSpeedSensor1()->getValidity();
-            bool isInvalidN1R2 = _tcscmp(label, _T("N1-R2")) == 0 && !engine->getSpeedSensor2()->getValidity();
+            bool isInvalidN1L1 = _tcscmp(label, _T("N1-L1")) == 0 && !engine->getSpeedSensorL1()->getValidity();
+            bool isInvalidN1L2 = _tcscmp(label, _T("N1-L2")) == 0 && !engine->getSpeedSensorL2()->getValidity();
+            bool isInvalidN1R1 = _tcscmp(label, _T("N1-R1")) == 0 && !engine->getSpeedSensorR1()->getValidity();
+            bool isInvalidN1R2 = _tcscmp(label, _T("N1-R2")) == 0 && !engine->getSpeedSensorR2()->getValidity();
 
             // 判断是否为EGT表盘且对应的传感器无效
-            bool isInvalidEGT1 = _tcscmp(label, _T("EGT-L1")) == 0 && !engine->getEgtSensor1()->getValidity();
-            bool isInvalidEGT2 = _tcscmp(label, _T("EGT-L2")) == 0 && !engine->getEgtSensor2()->getValidity();
-            bool isInvalidEGT3 = _tcscmp(label, _T("EGT-R1")) == 0 && !engine->getEgtSensor1()->getValidity();
-            bool isInvalidEGT4 = _tcscmp(label, _T("EGT-R2")) == 0 && !engine->getEgtSensor2()->getValidity();
+            bool isInvalidEGT1 = _tcscmp(label, _T("EGT-L1")) == 0 && !engine->getEgtSensorL1()->getValidity();
+            bool isInvalidEGT2 = _tcscmp(label, _T("EGT-L2")) == 0 && !engine->getEgtSensorL2()->getValidity();
+            bool isInvalidEGT3 = _tcscmp(label, _T("EGT-R1")) == 0 && !engine->getEgtSensorR1()->getValidity();
+            bool isInvalidEGT4 = _tcscmp(label, _T("EGT-R2")) == 0 && !engine->getEgtSensorR2()->getValidity();
 
             if (isN1Dial && (isInvalidN1L1 || isInvalidN1L2 || isInvalidN1R1 || isInvalidN1R2)) {
                 _stprintf_s(valueText, _T("%s: --"), label);
@@ -842,23 +921,23 @@ public:
         void drawDials() {
             // 第一行 - 左侧传感器显示
             drawArcDial(DIAL_START_X, DIAL_START_Y, DIAL_RADIUS,
-                engine->getSpeedSensor1()->getValue(), 40000, _T("N1-L1"), RGB(0, 255, 0));
+                engine->getSpeedSensorL1()->getValue(), 40000, _T("N1-L1"), RGB(0, 255, 0));
             drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y, DIAL_RADIUS,
-                engine->getSpeedSensor2()->getValue(), 40000, _T("N1-L2"), RGB(0, 255, 0));
+                engine->getSpeedSensorL2()->getValue(), 40000, _T("N1-L2"), RGB(0, 255, 0));
             drawArcDial(DIAL_START_X + DIAL_SPACING_X * 2, DIAL_START_Y, DIAL_RADIUS,
-                engine->getEgtSensor1()->getValue(), 1200, _T("EGT-L1"), RGB(255, 128, 0));
+                engine->getEgtSensorL1()->getValue(), 1200, _T("EGT-L1"), RGB(255, 128, 0));
             drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y, DIAL_RADIUS,
-                engine->getEgtSensor2()->getValue(), 1200, _T("EGT-L2"), RGB(255, 128, 0));
+                engine->getEgtSensorL2()->getValue(), 1200, _T("EGT-L2"), RGB(255, 128, 0));
 
             // 第二行 - 右侧传感器显示 (假设右侧传感器与左侧相同)
             drawArcDial(DIAL_START_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-                engine->getSpeedSensor1()->getValue(), 40000, _T("N1-R1"), RGB(0, 255, 0));
+                engine->getSpeedSensorR1()->getValue(), 40000, _T("N1-R1"), RGB(0, 255, 0));
             drawArcDial(DIAL_START_X + DIAL_SPACING_X, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-                engine->getSpeedSensor2()->getValue(), 40000, _T("N1-R2"), RGB(0, 255, 0));
+                engine->getSpeedSensorR2()->getValue(), 40000, _T("N1-R2"), RGB(0, 255, 0));
             drawArcDial(DIAL_START_X + DIAL_SPACING_X * 2, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-                engine->getEgtSensor1()->getValue(), 1200, _T("EGT-R1"), RGB(255, 128, 0));
+                engine->getEgtSensorR1()->getValue(), 1200, _T("EGT-R1"), RGB(255, 128, 0));
             drawArcDial(DIAL_START_X + DIAL_SPACING_X * 3, DIAL_START_Y + DIAL_SPACING_Y, DIAL_RADIUS,
-                engine->getEgtSensor2()->getValue(), 1200, _T("EGT-R2"), RGB(255, 128, 0));
+                engine->getEgtSensorR2()->getValue(), 1200, _T("EGT-R2"), RGB(255, 128, 0));
         }
 
         void drawButton(const Button& btn) {
@@ -1138,7 +1217,7 @@ public:
             drawFuelFlow();  // 确保燃油流量显示在所有元素之后
             drawFuelAmount();  // 添加油量显示
 
-            // 绘制警告测���按钮
+            // 绘制警告测试按钮
             for (int i = 0; i < 14; i++) {
                 drawButton(warningButtons[i]);
             }
@@ -1174,23 +1253,30 @@ public:
                 if (checkButtonClick(warningButtons[i], mouseX, mouseY)) {
                     switch (i) {
                     case 0: // Single N1 Sensor
-                        engine->getSpeedSensor1()->setValidity(false);  // L1传感器失效
-                        engine->getSpeedSensor2()->setValidity(true);   // 确保L2传感器正常
-                        // 立即触发警告检查
+                        engine->getSpeedSensorL1()->setValidity(false);  // 只让L1失效
+                        engine->getSpeedSensorL2()->setValidity(true);   
+                        engine->getSpeedSensorR1()->setValidity(true);   
+                        engine->getSpeedSensorR2()->setValidity(true);   
                         engine->checkWarnings(engine->getCurrentTime());
                         break;
                     case 1: // Dual N1 Sensors
-                        engine->getSpeedSensor1()->setValidity(false);
-                        engine->getSpeedSensor2()->setValidity(false);
+                        engine->getSpeedSensorL1()->setValidity(false);
+                        engine->getSpeedSensorL2()->setValidity(false);
                         engine->checkWarnings(engine->getCurrentTime());
                         break;
                     case 2: // Single EGT Sensor
-                        engine->getEgtSensor1()->setValidity(false);
-                        engine->getEgtSensor2()->setValidity(true);
+                        engine->getEgtSensorL1()->setValidity(false);  // 只让L1失效
+                        engine->getEgtSensorL2()->setValidity(true);   
+                        engine->getEgtSensorR1()->setValidity(true);   
+                        engine->getEgtSensorR2()->setValidity(true);   
+                        engine->checkWarnings(engine->getCurrentTime());
                         break;
                     case 3: // Dual EGT Sensors
-                        engine->getEgtSensor1()->setValidity(false);
-                        engine->getEgtSensor2()->setValidity(false);
+                        engine->getEgtSensorL1()->setValidity(false);  // L1失效
+                        engine->getEgtSensorL2()->setValidity(false);  // L2失效
+                        engine->getEgtSensorR1()->setValidity(true);   // R1保持正常
+                        engine->getEgtSensorR2()->setValidity(true);   // R2保持正常
+                        engine->checkWarnings(engine->getCurrentTime());
                         break;
                     case 4: // Low Fuel
                         engine->setFuelAmount(900);  // 设置接近低油量警告阈值
