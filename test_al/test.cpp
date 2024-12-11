@@ -181,7 +181,7 @@ public:
         }
         else {
             // 第二阶段
-            double t = accumulatedTime - 2.0;  // t0开始时间
+            double t = accumulatedTime - 2.0;  // t0����始时间
             double speed = 20000.0 + 23000.0 * log10(1.0 + t);
             N1 = (speed / RATED_SPEED) * 100.0;
 
@@ -671,7 +671,7 @@ public:
         Button decreaseThrust;
 
         // 添加测试警告按钮
-        Button warningButtons[14];
+        Button warningButtons[16];
 
         GUI(int w, int h, Engine* eng) : engine(eng) {
             // 确保 engine 指针有效
@@ -700,6 +700,8 @@ public:
                     _T("EGT Start L2"),   // 启动时EGT超温二级
                     _T("EGT Run L1"),     // 运行时EGT超温一级
                     _T("EGT Run L2"),     // 运行时EGT超温二级
+                    _T("All N1"),//所有N1传感器故障
+                    _T("All EGT"),//所有EGT传感器故障
                     _T("Reset All")   // 重置所有
             };
 
@@ -711,7 +713,7 @@ public:
             int buttonSpacing = 10;
             int buttonsPerRow = 7;
 
-            for (int i = 0; i < 14; i++) {
+            for (int i = 0; i < 16; i++) {
                 int row = i / buttonsPerRow;
                 int col = i % buttonsPerRow;
                 warningButtons[i] = {
@@ -786,7 +788,7 @@ public:
                 arcDegrees = 210;  // N1表盘使用210度
             }
             else if (isEGTDial) {
-                maxValueToDisplay = 1200;  // EGT最大值1200度
+                maxValueToDisplay = 1200;  // EGT最大��1200度
                 arcDegrees = 210;   // EGT表盘也使用210度
             }
 
@@ -819,7 +821,7 @@ public:
                 }
             }
 
-            // 根据值状态选择颜色
+            // 根据值状态选择颜��
             COLORREF valueColor = RGB(255, 255, 255);  // 默认白色
             if (isN1Dial) {
                 if (valueToDisplay > 105) valueColor = RGB(255, 128, 0);
@@ -1090,10 +1092,10 @@ public:
             // 设置燃油流量显示的颜色
             COLORREF textColor, borderColor, bgColor;
             if (fuelFlow > 0) {
-                if (fuelFlow > 50) {
-                    // 燃油流量超限 - 橙色警告
-                    textColor = RGB(255, 128, 0);   // 橙色文本
-                    borderColor = RGB(255, 128, 0); // 橙色边框
+                if (fuelFlow >= 50) {
+                    // 燃油流量超限 - 红色警告
+                    textColor = RGB(255, 0, 0);   // 红色文本
+                    borderColor = RGB(255, 0, 0); // 红色边框
                     bgColor = RGB(40, 40, 40);      // 背景色
                 }
                 else {
@@ -1218,7 +1220,7 @@ public:
             drawFuelAmount();  // 添加油量显示
 
             // 绘制警告测试按钮
-            for (int i = 0; i < 14; i++) {
+            for (int i = 0; i < 16; i++) {
                 drawButton(warningButtons[i]);
             }
 
@@ -1249,7 +1251,7 @@ public:
             }
 
             // 检查警告测试按钮
-            for (int i = 0; i < 14; i++) {
+            for (int i = 0; i < 16; i++) {
                 if (checkButtonClick(warningButtons[i], mouseX, mouseY)) {
                     switch (i) {
                     case 0: // Single N1 Sensor
@@ -1262,6 +1264,8 @@ public:
                     case 1: // Dual N1 Sensors
                         engine->getSpeedSensorL1()->setValidity(false);
                         engine->getSpeedSensorL2()->setValidity(false);
+                        engine->getSpeedSensorR1()->setValidity(true);
+                        engine->getSpeedSensorR2()->setValidity(true);
                         engine->checkWarnings(engine->getCurrentTime());
                         break;
                     case 2: // Single EGT Sensor
@@ -1274,8 +1278,8 @@ public:
                     case 3: // Dual EGT Sensors
                         engine->getEgtSensorL1()->setValidity(false);  // L1失效
                         engine->getEgtSensorL2()->setValidity(false);  // L2失效
-                        engine->getEgtSensorR1()->setValidity(true);   // R1保持正常
-                        engine->getEgtSensorR2()->setValidity(true);   // R2保持正常
+                        engine->getEgtSensorR1()->setValidity(true);   // R1失效
+                        engine->getEgtSensorR2()->setValidity(true);   // R2失效
                         engine->checkWarnings(engine->getCurrentTime());
                         break;
                     case 4: // Low Fuel
@@ -1286,11 +1290,12 @@ public:
                         break;
                     case 6: // High Fuel Flow
                         if (engine->getIsRunning()) {
-                            engine->setFuelFlow(52.0);  // 设置超过燃油流量限制
+                            engine->setFuelFlow(50.0);  // 设置超过燃油流量限制
                             engine->checkWarnings(engine->getCurrentTime());
-                            engine->increaseThrust();
-                            engine->decreaseThrust();
-                            //此处认为故障时可能是漏油不改变温度和转速
+                            for (int j = 0; j < 10; j++) {
+                                engine->increaseThrust();
+                                Sleep(50);  // 添加50毫秒的间隔
+                            }
                         }
                         break;
                     case 7: // N1 Overspeed L1
@@ -1331,7 +1336,21 @@ public:
                             engine->setTemperature(1120.0);  // 设置运行时EGT超过1100度
                         }
                         break;
-                    case 13: // Reset All
+                    case 13: // 所有N1传感器故障
+                        engine->getSpeedSensorL1()->setValidity(false);
+                        engine->getSpeedSensorL2()->setValidity(false);
+                        engine->getSpeedSensorR1()->setValidity(false);
+                        engine->getSpeedSensorR2()->setValidity(false);
+                        engine->checkWarnings(engine->getCurrentTime());
+                        break;
+                    case 14: // 所有EGT传感器故障
+                        engine->getEgtSensorL1()->setValidity(false);
+                        engine->getEgtSensorL2()->setValidity(false);
+                        engine->getEgtSensorR1()->setValidity(false);
+                        engine->getEgtSensorR2()->setValidity(false);
+                        engine->checkWarnings(engine->getCurrentTime());
+                        break;
+                    case 15: // Reset All
                         // 重置所有参数到正常值
                         engine->resetSensors();
                         if (engine->getIsRunning()) {
