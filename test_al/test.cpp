@@ -1209,16 +1209,16 @@ public:
                         break;
                     case 7: // N1 Overspeed L1
                         if (engine->getIsRunning()) {
-                            engine->setN1(107.0);  // 设置N1超过105%但小于120%
                             engine->increaseThrust();
                             engine->decreaseThrust();
+                            engine->setN1(107.0);  // 设置N1超过105%但小于120%
                         }
                         break;
                     case 8: // N1 Overspeed L2
                         if (engine->getIsRunning()) {
-                            engine->setN1(130.0);  // 设置N1超过120%
                             engine->increaseThrust();
                             engine->decreaseThrust();
+                            engine->setN1(130.0);  // 设置N1超过120%
                         }
                         break;
                     case 9: // EGT Start L1
@@ -1233,16 +1233,16 @@ public:
                         break;
                     case 11: // EGT Run L1
                         if (engine->getIsRunning()) {
-                            engine->setTemperature(970.0);  // 设置运行时EGT接近950度警告值
                             engine->increaseThrust();
                             engine->decreaseThrust();
+                            engine->setTemperature(970.0);  // 设置运行时EGT接近950度警告值
                         }
                         break;
                     case 12: // EGT Run L2
                         if (engine->getIsRunning()) {
-                            engine->setTemperature(1120.0);  // 设置运行时EGT超过1100度
                             engine->increaseThrust();
                             engine->decreaseThrust();
+                            engine->setTemperature(1120.0);  // 设置运行时EGT超过1100度
                         }
                         break;
                     case 13: // Reset All
