@@ -36,6 +36,8 @@ private:
     bool isStarting;
     bool isStopping;  // 停止状态
     bool isThrusting;  // 推力状态
+    bool StrangeTempStartingL1;  // 起动时异常温度Level1
+    bool StrangeTempStartingL2;  // 起动时异常温度Level2
     double stopStartTime;  // 开始停止时间
     static const double RATED_SPEED; // 额定转速
     static const double T0;  // 初始温度
@@ -55,6 +57,7 @@ private:
     DataLogger* logger;  // 日志记录器指针
     map<string, double> lastLogTimes;  // 每次日志记录时间
     map<string, double> lastWarningTimes;  // 添加警告记录时间映射
+
 
     void addWarning(const string& message, WarningLevel level, double currentTime) {
         // 检查是否在5秒内已经记录过相同的警告
@@ -93,6 +96,9 @@ public:
     double getFuelAmount() const { return fuelAmount; }
     bool getIsRunning() const { return isRunning; }
     bool getIsStarting() const { return isStarting; }
+
+    void setStrangeTempStartingL1(bool value) { StrangeTempStartingL1 = value; }
+    void setStrangeTempStartingL2(bool value) { StrangeTempStartingL2 = value; }
 
     void stop() {
         isRunning = false;
@@ -170,7 +176,18 @@ public:
             speedSensorR1->setValue(speed);
             speedSensorR2->setValue(speed);
             fuelFlow = 5.0 * accumulatedTime;
-            temperature = T0;  // 初始温度
+            if(StrangeTempStartingL2)
+            {//L1异常温度
+                temperature = 1001;
+            }
+            else if(StrangeTempStartingL1)
+            {//L2异常温度
+                temperature =  851;
+            }
+            else
+            {
+                temperature = T0;
+            }
 
             egtSensorL1->setValue(temperature);
             egtSensorL2->setValue(temperature);
@@ -192,7 +209,18 @@ public:
             fuelFlow = 10.0 + 42.0 * log10(1.0 + t);
 
             // 计算温度 T = 900*lg(t-1) + T0
-            temperature = 900.0 * log10(t + 1.0) + T0;
+            if(StrangeTempStartingL2)
+            {//L1异常温度
+                temperature = 900.0 * log10(t + 1.0) + 1001;
+            }
+            else if(StrangeTempStartingL1)
+            {//L2异常温度
+                temperature = 900.0 * log10(t + 1.0) + 851;
+            }
+            else
+            {
+                temperature = 900.0 * log10(t + 1.0) + T0;
+            }
 
             double randFactor = 1.0 + (rand() % 6 - 3) / 100.0;
             double displaySpeed = speed * randFactor;
@@ -1290,12 +1318,10 @@ public:
                         break;
                     case 6: // High Fuel Flow
                         if (engine->getIsRunning()) {
-                            engine->setFuelFlow(50.0);  // 设置超过燃油流量限制
+                            engine->setFuelFlow(51.0);  // 设置超过燃油流量限制
                             engine->checkWarnings(engine->getCurrentTime());
-                            for (int j = 0; j < 10; j++) {
-                                engine->increaseThrust();
-                                Sleep(50);  // 添加50毫秒的间隔
-                            }
+                            engine->increaseThrust();
+                            engine->decreaseThrust();   
                         }
                         break;
                     case 7: // N1 Overspeed L1
@@ -1314,12 +1340,12 @@ public:
                         break;
                     case 9: // EGT Start L1
                         if (engine->getIsStarting()) {
-                            engine->setTemperature(880.0);  // 设置启动时EGT接近850度警告值
+                            engine->setStrangeTempStartingL1(true);
                         }
                         break;
                     case 10: // EGT Start L2
                         if (engine->getIsStarting()) {
-                            engine->setTemperature(1020.0);  // 设置启动时EGT超过1000度
+                            engine->setStrangeTempStartingL2(true);
                         }
                         break;
                     case 11: // EGT Run L1
@@ -1359,6 +1385,8 @@ public:
                             engine->setFuelFlow(40.0);
                         }
                         engine->setFuelAmount(20000.0);
+                        engine->setStrangeTempStartingL1(false);
+                        engine->setStrangeTempStartingL2(false);
                         break;
                     }
                 }
