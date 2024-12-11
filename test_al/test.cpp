@@ -411,7 +411,7 @@ public:
         }
 
         // 双发动机传感器故障检查
-        if ((n1L1Failed && n1L2Failed && !n1R1Failed && !n1R2Failed) && (egtL1Failed && egtL2Failed && !egtR1Failed && !egtR2Failed)) {
+        if ((n1L1Failed && n1L2Failed && n1R1Failed && n1R2Failed) || (egtL1Failed && egtL2Failed && egtR1Failed && egtR2Failed)) {
             addWarning("Dual Engine Sensor Failure - Shutdown", WARNING, currentTime);
             stop();
         }
