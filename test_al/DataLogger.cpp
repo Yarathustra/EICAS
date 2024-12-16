@@ -4,8 +4,8 @@ using namespace std;
 // 获取当前时间的字符串表示
 string DataLogger::getCurrentTimeString() {
     time_t now = time(0);
-    struct tm timeinfo;
     char buffer[80];
+    struct tm timeinfo;
     localtime_s(&timeinfo, &now);
     strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
     return string(buffer);
